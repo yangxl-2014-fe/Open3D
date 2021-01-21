@@ -110,9 +110,9 @@ void ComputeTransformPointToPlaneCPU(const float *src_pcd_ptr,
     utility::LogInfo(" CPU Process Time 1: {}", time_.GetDuration());
     utility::Timer inverse_time_;
     inverse_time_.Start();
-    core::Tensor Pose = (ATA.Inverse().Matmul(ATB)).Reshape({-1});
+    core::Tensor Pose = (ATA.Solve(ATB)).Reshape({-1});
     inverse_time_.Stop();
-    utility::LogInfo(" CPU Inverse Time 1: {}", inverse_time_.GetDuration());
+    utility::LogInfo(" CPU Solve Time 1: {}", inverse_time_.GetDuration());
     utility::Timer transformation_time_;
     transformation_time_.Start();
     tranformation = t::pipelines::kernel::PoseToTransformation(Pose.To(dtype));
