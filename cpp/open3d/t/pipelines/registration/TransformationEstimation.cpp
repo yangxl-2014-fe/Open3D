@@ -130,7 +130,6 @@ inline core::Tensor ComputeP2Plane_1(const core::Tensor &source_select,
                                      const core::Tensor &target_n_select,
                                      const core::Dtype dtype,
                                      const core::Device device) {
-
     utility::Timer time_;
     time_.Start();
 
@@ -180,12 +179,14 @@ inline core::Tensor ComputeP2Plane_1(const core::Tensor &source_select,
               target_n_select);
 
     time_.Stop();
-    utility::LogInfo(" {} Process Time 1: {}", device.ToString(), time_.GetDuration());
+    utility::LogInfo(" {} Process Time 1: {}", device.ToString(),
+                     time_.GetDuration());
     utility::Timer leastSq_time_;
-    leastSq_time_.Start();      
+    leastSq_time_.Start();
     core::Tensor Pose = (A.LeastSquares(B)).Reshape({-1}).To(dtype);
-    leastSq_time_.Stop();      
-    utility::LogInfo(" {} LeastSq. Time 1: {}", device.ToString(), leastSq_time_.GetDuration());
+    leastSq_time_.Stop();
+    utility::LogInfo(" {} LeastSq. Time 1: {}", device.ToString(),
+                     leastSq_time_.GetDuration());
     return t::pipelines::kernel::PoseToTransformation(Pose.Reshape({-1}));
 }
 

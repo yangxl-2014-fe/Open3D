@@ -78,11 +78,13 @@ int main(int argc, char *argv[]) {
     t::io::ReadPointCloud(argv[2], source, {"auto", false, false, true});
     t::io::ReadPointCloud(argv[3], target, {"auto", false, false, true});
 
-    core::Tensor source_points = source.GetPoints().To(device, dtype, /*copy=*/true);
+    core::Tensor source_points =
+            source.GetPoints().To(device, dtype, /*copy=*/true);
     t::geometry::PointCloud source_device(device);
     source_device.SetPoints(source_points);
 
-    core::Tensor target_points = target.GetPoints().To(device, dtype, /*copy=*/true);
+    core::Tensor target_points =
+            target.GetPoints().To(device, dtype, /*copy=*/true);
     core::Tensor target_normals =
             target.GetPointNormals().To(dtype).To(device, dtype, /*copy=*/true);
     t::geometry::PointCloud target_device(device);

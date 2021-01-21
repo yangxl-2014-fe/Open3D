@@ -46,10 +46,8 @@ void ComputeTransformPointToPlaneCPU(const float *src_pcd_ptr,
     time_.Start();
 
     core::Dtype double_ = core::Dtype::Float64;
-    core::Tensor atai =
-            core::Tensor::Empty({n, 21}, double_, device);
-    core::Tensor atbi =
-            core::Tensor::Empty({n, 6}, double_, device);
+    core::Tensor atai = core::Tensor::Empty({n, 21}, double_, device);
+    core::Tensor atbi = core::Tensor::Empty({n, 6}, double_, device);
     double *atai_ptr = static_cast<double *>(atai.GetDataPtr());
     double *atbi_ptr = static_cast<double *>(atbi.GetDataPtr());
 
@@ -95,8 +93,7 @@ void ComputeTransformPointToPlaneCPU(const float *src_pcd_ptr,
     // Get the ATA matrix back:
     // Getting ATA and ATB in orginial form is NOT required if
     // ATA.Inverse().Matmul(ATB) is going to be hardcoded with values.
-    core::Tensor ATA =
-            core::Tensor::Empty({6, 6}, double_, device);
+    core::Tensor ATA = core::Tensor::Empty({6, 6}, double_, device);
     double *ATA_ptr = static_cast<double *>(ATA.GetDataPtr());
     const double *ata_1x21_ptr =
             static_cast<const double *>(ata_1x21.GetDataPtr());
@@ -112,15 +109,16 @@ void ComputeTransformPointToPlaneCPU(const float *src_pcd_ptr,
     time_.Stop();
     utility::LogInfo(" CPU Process Time 1: {}", time_.GetDuration());
     utility::Timer inverse_time_;
-    inverse_time_.Start();    
+    inverse_time_.Start();
     core::Tensor Pose = (ATA.Inverse().Matmul(ATB)).Reshape({-1});
     inverse_time_.Stop();
     utility::LogInfo(" CPU Inverse Time 1: {}", inverse_time_.GetDuration());
     utility::Timer transformation_time_;
-    transformation_time_.Start();        
+    transformation_time_.Start();
     tranformation = t::pipelines::kernel::PoseToTransformation(Pose.To(dtype));
     transformation_time_.Stop();
-    utility::LogInfo(" CPU Transformation Time 1: {}", transformation_time_.GetDuration());
+    utility::LogInfo(" CPU Transformation Time 1: {}",
+                     transformation_time_.GetDuration());
 }
 
 }  // namespace kernel
