@@ -27,6 +27,7 @@
 #include "open3d/t/pipelines/registration/TransformationEstimation.h"
 
 #include "open3d/t/pipelines/kernel/ComputeTransformPointToPlane.h"
+#include "open3d/utility/Timer.h"
 
 namespace open3d {
 namespace t {
@@ -129,6 +130,10 @@ inline core::Tensor ComputeP2Plane_1(const core::Tensor &source_select,
                                      const core::Tensor &target_n_select,
                                      const core::Dtype dtype,
                                      const core::Device device) {
+
+    utility::Timer time_;
+    time_.Start();
+
     core::Tensor B = ((target_select - source_select).Mul_(target_n_select))
                              .Sum({1}, true)
                              .To(dtype);
@@ -174,9 +179,14 @@ inline core::Tensor ComputeP2Plane_1(const core::Tensor &source_select,
                core::TensorKey::Slice(3, 6, 1)},
               target_n_select);
 
+    time_.Stop();
+    utility::LogInfo(" {} Process Time 1: {}", device.ToString(), time_.GetDuration());
+    utility::Timer leastSq_time_;
+    leastSq_time_.Start();      
     core::Tensor Pose = (A.LeastSquares(B)).Reshape({-1}).To(dtype);
-    utility::LogInfo(" Pose: {}", Pose.ToString());
-    return t::pipelines::kernel::PoseToTransformation(Pose);
+    leastSq_time_.Stop();      
+    utility::LogInfo(" {} LeastSq. Time 1: {}", device.ToString(), leastSq_time_.GetDuration());
+    return t::pipelines::kernel::PoseToTransformation(Pose.Reshape({-1}));
 }
 
 core::Tensor TransformationEstimationPointToPlane::ComputeTransformation(
@@ -203,7 +213,7 @@ core::Tensor TransformationEstimationPointToPlane::ComputeTransformation(
     return pipelines::kernel::ComputeTransformPointToPlane(
             source_select, target_select, target_n_select, dtype, device);
     // return ComputeP2Plane_1(source_select, target_select, target_n_select,
-    // dtype, device);
+    //                         dtype, device);
 }
 
 }  // namespace registration

@@ -28,6 +28,7 @@
 #include "open3d/core/kernel/CPULauncher.h"
 #include "open3d/t/pipelines/kernel/ComputeTransformPointToPlane.h"
 #include "open3d/t/pipelines/kernel/TransformationConverter.h"
+#include "open3d/utility/Timer.h"
 
 namespace open3d {
 namespace t {
@@ -41,10 +42,14 @@ void ComputeTransformPointToPlaneCPU(const float *src_pcd_ptr,
                                      core::Tensor &tranformation,
                                      const core::Dtype dtype,
                                      const core::Device device) {
+    utility::Timer time_;
+    time_.Start();
+
+    core::Dtype double_ = core::Dtype::Float64;
     core::Tensor atai =
-            core::Tensor::Empty({n, 21}, core::Dtype::Float64, device);
+            core::Tensor::Empty({n, 21}, double_, device);
     core::Tensor atbi =
-            core::Tensor::Empty({n, 6}, core::Dtype::Float64, device);
+            core::Tensor::Empty({n, 6}, double_, device);
     double *atai_ptr = static_cast<double *>(atai.GetDataPtr());
     double *atbi_ptr = static_cast<double *>(atbi.GetDataPtr());
 
@@ -72,7 +77,7 @@ void ComputeTransformPointToPlaneCPU(const float *src_pcd_ptr,
                                (ny * sx - nx * sy),
                                nx,
                                ny,
-                               ny};
+                               nz};
 
                 for (int i = 0, j = 0; j < 6; j++) {
                     for (int k = 0; k <= j; k++) {
@@ -91,7 +96,7 @@ void ComputeTransformPointToPlaneCPU(const float *src_pcd_ptr,
     // Getting ATA and ATB in orginial form is NOT required if
     // ATA.Inverse().Matmul(ATB) is going to be hardcoded with values.
     core::Tensor ATA =
-            core::Tensor::Empty({6, 6}, core::Dtype::Float64, device);
+            core::Tensor::Empty({6, 6}, double_, device);
     double *ATA_ptr = static_cast<double *>(ATA.GetDataPtr());
     const double *ata_1x21_ptr =
             static_cast<const double *>(ata_1x21.GetDataPtr());
@@ -104,17 +109,18 @@ void ComputeTransformPointToPlaneCPU(const float *src_pcd_ptr,
         }
     }
 
-    // utility::LogInfo(" ATA: \n{},\n ATB: \n{},\n ATA.Inverse(CPU): \n{}, \n
-    // ATA.Inverse().Matmul(ATB): \n{}\n",
-    //                 ATA.ToString(), ATB.ToString(), ATA.Inverse().ToString(),
-    //                 ATA.Inverse().Matmul(ATB).ToString());
-
-    // core::Tensor Pose = (ATA.Inverse().Matmul(ATB)).Reshape({-1});
-    core::Tensor Pose = (ATA.Solve(ATB)).Reshape({-1});
-    // utility::LogInfo("\n POSE: \n{}", Pose.ToString());
-
+    time_.Stop();
+    utility::LogInfo(" CPU Process Time 1: {}", time_.GetDuration());
+    utility::Timer inverse_time_;
+    inverse_time_.Start();    
+    core::Tensor Pose = (ATA.Inverse().Matmul(ATB)).Reshape({-1});
+    inverse_time_.Stop();
+    utility::LogInfo(" CPU Inverse Time 1: {}", inverse_time_.GetDuration());
+    utility::Timer transformation_time_;
+    transformation_time_.Start();        
     tranformation = t::pipelines::kernel::PoseToTransformation(Pose.To(dtype));
-    return;
+    transformation_time_.Stop();
+    utility::LogInfo(" CPU Transformation Time 1: {}", transformation_time_.GetDuration());
 }
 
 }  // namespace kernel
