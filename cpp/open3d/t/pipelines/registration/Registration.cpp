@@ -90,22 +90,9 @@ static RegistrationResult GetRegistrationResultAndCorrespondences(
     result.correspondence_set.second = indices.IndexGet({valid});
     distances = distances.IndexGet({valid});
 
-    // std::pair<core::Tensor, core::Tensor> result_nns =
-    // target_nns.HybridSearch(
-    //         source.GetPoints(), max_correspondence_distance, 1);
-
-    // result.correspondence_select_bool_ =
-    //         (result_nns.first.Ne(-1)).Reshape({-1});
-    // result.correspondence_set_ =
-    //         result_nns.first.IndexGet({result.correspondence_select_bool_})
-    //                 .Reshape({-1});
-    // core::Tensor dist_select =
-    //         result_nns.second.IndexGet({result.correspondence_select_bool_})
-    //                 .Reshape({-1});
-
     time_Search.Stop();
     time_GetCorres.Stop();
-
+    
     time_GetResults.Start();
 
     int num_correspondences = result.correspondence_set.first.GetShape()[0];
