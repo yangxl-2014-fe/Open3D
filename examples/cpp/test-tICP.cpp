@@ -46,8 +46,8 @@
 using namespace open3d;
 
 // Parameters to adjust according to the test pointcloud.
-double voxel_downsample_factor = 1.0;
-double max_correspondence_dist = 0.2;
+double voxel_downsample_factor = 5.0;
+double max_correspondence_dist = 0.5;
 
 // ICP ConvergenceCriteria:
 double relative_fitness = 1e-6;
