@@ -62,6 +62,7 @@ EXAMPLE_CPP(ViewPCDMatch              ${CMAKE_PROJECT_NAME})
 EXAMPLE_CPP(Visualizer                ${CMAKE_PROJECT_NAME})
 EXAMPLE_CPP(Voxelization              ${CMAKE_PROJECT_NAME})
 EXAMPLE_CPP(test-tICP                 ${CMAKE_PROJECT_NAME})
+EXAMPLE_CPP(test-legacyICP            ${CMAKE_PROJECT_NAME})
 EXAMPLE_CPP(OpenMP                    ${CMAKE_PROJECT_NAME} ${OPENMP_TARGET})
 
 if(BUILD_LIBREALSENSE)

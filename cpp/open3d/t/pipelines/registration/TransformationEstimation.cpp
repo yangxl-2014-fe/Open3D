@@ -28,6 +28,7 @@
 
 #include "open3d/t/pipelines/kernel/ComputePosePointToPlane.h"
 #include "open3d/t/pipelines/kernel/TransformationConverter.h"
+#include "open3d/utility/Timer.h"
 
 namespace open3d {
 namespace t {
@@ -71,29 +72,69 @@ core::Tensor TransformationEstimationPointToPoint::ComputeTransformation(
         utility::LogError(
                 "Target Pointcloud device {} != Source Pointcloud's device {}.",
                 target.GetDevice().ToString(), device.ToString());
-    }
+    }    
+    utility::Timer time_RtKernel, time_Indexing, time_RtToTransform, time_A, time_B, time_C, time_D, time_E;
+
+    time_Indexing.Start();
     core::Tensor source_select = source.GetPoints().IndexGet({corres.first});
     core::Tensor target_select = target.GetPoints().IndexGet({corres.second});
+    time_Indexing.Stop();
+    utility::LogInfo("       Indexing input for solving: {}",
+                     time_Indexing.GetDuration());
 
+    time_RtKernel.Start();
     // https://ieeexplore.ieee.org/document/88573
+    time_A.Start();
     core::Tensor mux = source_select.Mean({0}, true);
     core::Tensor muy = target_select.Mean({0}, true);
+    time_A.Stop();
+    time_B.Start();
     core::Tensor Sxy =
             ((target_select - muy)
                      .T()
                      .Matmul(source_select - mux)
                      .Div_(static_cast<float>(corres.second.GetShape()[0])));
+    time_B.Stop();
+    time_C.Start();
     core::Tensor U, D, VT;
     std::tie(U, D, VT) = Sxy.SVD();
+    time_C.Stop();
+
+    time_D.Start();
     core::Tensor S = core::Tensor::Eye(3, dtype, device);
     if (U.Det() * (VT.T()).Det() < 0) {
         S[-1][-1] = -1;
     }
+    time_D.Stop();
+
+    time_E.Start();
     core::Tensor R, t;
     R = U.Matmul(S.Matmul(VT));
     t = muy.Reshape({-1}) - R.Matmul(mux.T()).Reshape({-1});
+    time_E.Stop();
 
-    return t::pipelines::kernel::RtToTransformation(R, t);
+    time_RtKernel.Stop();
+
+    utility::LogInfo("          A: {}", time_A.GetDuration());
+    utility::LogInfo("          B: {}", time_B.GetDuration());
+    utility::LogInfo("          C: {}", time_C.GetDuration());
+    utility::LogInfo("          D: {}", time_D.GetDuration());
+    utility::LogInfo("          E: {}", time_E.GetDuration());
+
+
+    utility::LogInfo("       Compute R,t Kernel: {}",
+                     time_RtKernel.GetDuration());
+
+    time_RtToTransform.Start();
+
+    // Get transformation {4,4} from pose {6}.
+    core::Tensor transformation = t::pipelines::kernel::RtToTransformation(R, t);
+
+    time_RtToTransform.Stop();
+    utility::LogInfo("       R,t to Transformation: {}",
+                     time_RtToTransform.GetDuration());
+
+    return transformation;
 }
 
 double TransformationEstimationPointToPlane::ComputeRMSE(
@@ -138,13 +179,25 @@ core::Tensor TransformationEstimationPointToPlane::ComputeTransformation(
                 target.GetDevice().ToString(), device.ToString());
     }
 
+    utility::Timer time_PoseKernel, time_PoseToTransform;
+    time_PoseKernel.Start();
+
     // Get pose {6} from correspondences indexed source and target point cloud.
     core::Tensor pose = pipelines::kernel::ComputePosePointToPlane(
             source.GetPoints(), target.GetPoints(), target.GetPointNormals(),
             corres);
 
+    time_PoseKernel.Stop();
+    utility::LogInfo("       Compute Pose Kernel: {}",
+                     time_PoseKernel.GetDuration());
+    time_PoseToTransform.Start();
+
     // Get transformation {4,4} from pose {6}.
     core::Tensor transformation = pipelines::kernel::PoseToTransformation(pose);
+
+    time_PoseToTransform.Stop();
+    utility::LogInfo("       Pose to Transformation: {}",
+                     time_PoseToTransform.GetDuration());
 
     return transformation;
 }

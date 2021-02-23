@@ -31,6 +31,7 @@
 #include "open3d/pipelines/registration/Feature.h"
 #include "open3d/utility/Console.h"
 #include "open3d/utility/Helper.h"
+#include "open3d/utility/Timer.h"
 
 namespace open3d {
 namespace pipelines {
@@ -162,19 +163,49 @@ RegistrationResult RegistrationICP(
         pcd.Transform(init);
     }
     RegistrationResult result;
+
+    utility::Timer time_getCorres;
+    time_getCorres.Start();
+
     result = GetRegistrationResultAndCorrespondences(
             pcd, target, kdtree, max_correspondence_distance, transformation);
+
+    time_getCorres.Stop();
+    // Correspondence Search computed in current iteration is used in next
+    // iteration.
+    double getCorresTimeNew = 0.0;
+    double getCorresTimePrev = time_getCorres.GetDuration();
+
     for (int i = 0; i < criteria.max_iteration_; i++) {
         utility::LogDebug("ICP Iteration #{:d}: Fitness {:.4f}, RMSE {:.4f}", i,
                           result.fitness_, result.inlier_rmse_);
+
+        utility::Timer time_registrationICP, time_getCorres,
+                time_computeTransformation;
+        utility::LogInfo("     GetRegistrationResultAndCorrespondences: {}",
+                         getCorresTimePrev);
+
+        time_registrationICP.Start();
+        time_computeTransformation.Start();
+
         Eigen::Matrix4d update = estimation.ComputeTransformation(
                 pcd, target, result.correspondence_set_);
         transformation = update * transformation;
+
+        time_computeTransformation.Stop();
+        utility::LogInfo("     ComputeTransform: {}",
+                         time_computeTransformation.GetDuration());
+
         pcd.Transform(update);
         RegistrationResult backup = result;
+
+        time_getCorres.Start();
         result = GetRegistrationResultAndCorrespondences(
                 pcd, target, kdtree, max_correspondence_distance,
                 transformation);
+
+        time_getCorres.Stop();
+        getCorresTimeNew = time_getCorres.GetDuration();
 
         if (std::abs(backup.fitness_ - result.fitness_) <
                     criteria.relative_fitness_ &&
@@ -182,6 +213,11 @@ RegistrationResult RegistrationICP(
                     criteria.relative_rmse_) {
             break;
         }
+
+        time_registrationICP.Stop();
+        utility::LogInfo("   Registration Loop: {}",
+                         time_registrationICP.GetDuration());
+        getCorresTimePrev = getCorresTimeNew;
     }
     return result;
 }

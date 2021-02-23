@@ -54,97 +54,88 @@ double relative_fitness = 1e-6;
 double relative_rmse = 1e-6;
 int max_iterations = 5;
 
+void VisualizeRegistration(const open3d::geometry::PointCloud &source,
+                           const open3d::geometry::PointCloud &target,
+                           const Eigen::Matrix4d &Transformation) {
+    std::shared_ptr<geometry::PointCloud> source_transformed_ptr(
+            new geometry::PointCloud);
+    std::shared_ptr<geometry::PointCloud> target_ptr(new geometry::PointCloud);
+    *source_transformed_ptr = source;
+    *target_ptr = target;
+    source_transformed_ptr->Transform(Transformation);
+    visualization::DrawGeometries({source_transformed_ptr, target_ptr},
+                                  "Registration result");
+}
+
+
 int main(int argc, char *argv[]) {
-    // Argument 1: Device: 'CPU:0' for CPU, 'CUDA:0' for GPU
-    // Argument 2: Path to the test PointCloud
+    // Argument 1: Path to the source PointCloud
+    // Argument 2: Path to the target PointCloud
 
-    auto device = core::Device(argv[1]);
-    auto dtype = core::Dtype::Float32;
-
-    // t::io::ReadPointCloud, changes the device to CPU and DType to Float64
-    t::geometry::PointCloud target_;
-    // t::geometry::PointCloud target(device);
-    t::io::ReadPointCloud(argv[2], target_, {"auto", false, false, true});
+    // Creating Tensor PointCloud Input from argument specified file
+    // std::shared_ptr<open3d::geometry::PointCloud> source =
+    //         open3d::io::CreatePointCloudFromFile(argv[1]);
+    std::shared_ptr<open3d::geometry::PointCloud> target_ =
+            open3d::io::CreatePointCloudFromFile(argv[1]);
 
     utility::LogInfo(" Input Successful ");
-
-    // geometry::PointCloud legacy_s = source_.ToLegacyPointCloud();
-    geometry::PointCloud legacy_t = target_.ToLegacyPointCloud();
-
-    // legacy_s.VoxelDownSample(voxel_downsample_factor);
-    // legacy_t = *legacy_t.VoxelDownSample(voxel_downsample_factor);
+    geometry::PointCloud legacy_t = *target_;
+    legacy_t = *legacy_t.VoxelDownSample(voxel_downsample_factor);
     utility::LogInfo(" Downsampling Successful ");
 
     legacy_t.EstimateNormals(open3d::geometry::KDTreeSearchParamKNN(), false);
     utility::LogInfo(" Normal Estimation Successful ");
 
-    t::geometry::PointCloud source =
-            t::geometry::PointCloud::FromLegacyPointCloud(legacy_t);
+    geometry::PointCloud source = legacy_t;
+    geometry::PointCloud target = legacy_t;
 
-    t::geometry::PointCloud target =
-            t::geometry::PointCloud::FromLegacyPointCloud(legacy_t);
-
-    // Creating Tensor from manual transformation vector
-    core::Tensor trans =
-            core::Tensor::Init<float>({{0.862, 0.011, -0.507, 0.5},
-                                       {-0.139, 0.967, -0.215, 0.7},
-                                       {0.487, 0.255, 0.835, -1.4},
-                                       {0.0, 0.0, 0.0, 1.0}},
-                                      core::Device("CPU:0"));
-    target = target.Transform(trans);
+    Eigen::Matrix4d trans;
+    trans << 0.862, 0.011, -0.507, 0.5, -0.139, 0.967, -0.215, 0.7, 0.487,
+            0.255, 0.835, -1.4, 0.0, 0.0, 0.0, 1.0;
+    target.Transform(trans);
     utility::LogInfo(" Target transformation Successful ");
 
-    core::Tensor source_points =
-            source.GetPoints().To(device, dtype, /*copy=*/true);
-    t::geometry::PointCloud source_device(device);
-    source_device.SetPoints(source_points);
-    utility::LogInfo(" Creating Source Pointcloud on device Successful ");
+    Eigen::Matrix4d init_trans = Eigen::Matrix4d::Identity();
 
-    core::Tensor target_points =
-            target.GetPoints().To(device, dtype, /*copy=*/true);
-    core::Tensor target_normals =
-            target.GetPointNormals().To(device, dtype, /*copy=*/true);
-    t::geometry::PointCloud target_device(device);
-    target_device.SetPoints(target_points);
-    target_device.SetPointNormals(target_normals);
-    utility::LogInfo(" Creating Target Pointcloud on device Successful ");
+    utility::LogInfo(" Input Process on Legacy CPU Success");
 
-    core::Tensor init_trans = core::Tensor::Eye(4, dtype, device);
+    VisualizeRegistration(source, target, init_trans);
 
-    utility::LogInfo(" Input Process on {} Success", device.ToString());
+    open3d::pipelines::registration::RegistrationResult evaluation(init_trans);
 
-    t::pipelines::registration::RegistrationResult evaluation(trans);
-    evaluation = open3d::t::pipelines::registration::EvaluateRegistration(
-            source_device, target_device, max_correspondence_dist, init_trans);
-    utility::LogInfo(" EvaluateRegistration Success ");
+    evaluation = open3d::pipelines::registration::EvaluateRegistration(
+            source, target, max_correspondence_dist, init_trans);
+    utility::LogInfo(" EvaluateRegistration Success");
 
     // ICP: Point to Plane
     utility::Timer icp_p2plane_time;
     icp_p2plane_time.Start();
-    auto reg_p2plane = open3d::t::pipelines::registration::RegistrationICP(
-            source_device, target_device, max_correspondence_dist, init_trans,
-            open3d::t::pipelines::registration::
+    auto reg_p2plane = open3d::pipelines::registration::RegistrationICP(
+            source, target, max_correspondence_dist, init_trans,
+            open3d::pipelines::registration::
                     TransformationEstimationPointToPlane(),
-            open3d::t::pipelines::registration::ICPConvergenceCriteria(
+            open3d::pipelines::registration::ICPConvergenceCriteria(
                     relative_fitness, relative_rmse, max_iterations));
     icp_p2plane_time.Stop();
+
     // Printing result for ICP Point to Plane
     utility::LogInfo(" [ICP: Point to Plane] ");
+    utility::LogInfo(
+            "   EvaluateRegistration on [Legacy CPU Implementation] Success ");
     utility::LogInfo("   Convergence Criteria: ");
     utility::LogInfo(
             "   Relative Fitness: {}, Relative Fitness: {}, Max Iterations {}",
             relative_fitness, relative_rmse, max_iterations);
-    utility::LogInfo("   EvaluateRegistration on {} Success ",
-                     device.ToString());
-    utility::LogInfo("     [PointCloud Size]: ");
-    utility::LogInfo("       Points: {} Target Points: {} ",
-                     source_points.GetShape().ToString(),
-                     target_points.GetShape().ToString());
-    utility::LogInfo("       Fitness: {} ", reg_p2plane.fitness_);
-    utility::LogInfo("       Inlier RMSE: {} ", reg_p2plane.inlier_rmse_);
+    utility::LogInfo(
+            "   [Correspondences]: {}, [maximum corrspondence distance = {}] ",
+            reg_p2plane.correspondence_set_.size(), max_correspondence_dist);
+    utility::LogInfo("     Fitness: {} ", reg_p2plane.fitness_);
+    utility::LogInfo("     Inlier RMSE: {} ", reg_p2plane.inlier_rmse_);
     utility::LogInfo("     [Time]: {}", icp_p2plane_time.GetDuration());
-    utility::LogInfo("     [Transformation Matrix]: \n{}",
-                     reg_p2plane.transformation_.ToString());
+    utility::LogInfo("     [Tranformation Matrix]: ");
+    std::cout << reg_p2plane.transformation_ << std::endl;
+
+    VisualizeRegistration(source, target, reg_p2plane.transformation_);
 
     return 0;
 }
