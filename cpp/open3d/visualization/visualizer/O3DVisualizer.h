@@ -127,6 +127,12 @@ public:
                      double time = 0.0,
                      bool is_visible = true);
 
+    void AddModel(const std::string& name,
+                  std::shared_ptr<rendering::TriangleMeshModel> model,
+                  const std::string& group = "",
+                  double time = 0.0,
+                  bool is_visible = true);
+
     void RemoveGeometry(const std::string& name);
 
     void ShowGeometry(const std::string& name, bool show);
