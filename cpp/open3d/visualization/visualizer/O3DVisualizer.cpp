@@ -1824,6 +1824,13 @@ void O3DVisualizer::AddGeometry(const std::string &name,
     impl_->AddGeometry(name, nullptr, tgeom, material, group, time, is_visible);
 }
 
+void O3DVisualizer::AddModel(
+        const std::string &name,
+        std::shared_ptr<rendering::TriangleMeshModel> model,
+        const std::string &group,
+        double time,
+        bool is_visible) {}
+
 void O3DVisualizer::RemoveGeometry(const std::string &name) {
     return impl_->RemoveGeometry(name);
 }
