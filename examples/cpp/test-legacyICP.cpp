@@ -113,7 +113,7 @@ int main(int argc, char *argv[]) {
     auto reg_p2plane = open3d::pipelines::registration::RegistrationICP(
             source, target, max_correspondence_dist, init_trans,
             open3d::pipelines::registration::
-                    TransformationEstimationPointToPlane(),
+                    TransformationEstimationPointToPoint(),
             open3d::pipelines::registration::ICPConvergenceCriteria(
                     relative_fitness, relative_rmse, max_iterations));
     icp_p2plane_time.Stop();
