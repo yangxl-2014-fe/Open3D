@@ -72,8 +72,9 @@ core::Tensor TransformationEstimationPointToPoint::ComputeTransformation(
         utility::LogError(
                 "Target Pointcloud device {} != Source Pointcloud's device {}.",
                 target.GetDevice().ToString(), device.ToString());
-    }    
-    utility::Timer time_RtKernel, time_Indexing, time_RtToTransform, time_A, time_B, time_C, time_D, time_E;
+    }
+    utility::Timer time_RtKernel, time_Indexing, time_RtToTransform, time_A,
+            time_B, time_C, time_D, time_E;
 
     time_Indexing.Start();
     core::Tensor source_select = source.GetPoints().IndexGet({corres.first});
@@ -121,14 +122,14 @@ core::Tensor TransformationEstimationPointToPoint::ComputeTransformation(
     utility::LogInfo("          D: {}", time_D.GetDuration());
     utility::LogInfo("          E: {}", time_E.GetDuration());
 
-
     utility::LogInfo("       Compute R,t Kernel: {}",
                      time_RtKernel.GetDuration());
 
     time_RtToTransform.Start();
 
     // Get transformation {4,4} from pose {6}.
-    core::Tensor transformation = t::pipelines::kernel::RtToTransformation(R, t);
+    core::Tensor transformation =
+            t::pipelines::kernel::RtToTransformation(R, t);
 
     time_RtToTransform.Stop();
     utility::LogInfo("       R,t to Transformation: {}",

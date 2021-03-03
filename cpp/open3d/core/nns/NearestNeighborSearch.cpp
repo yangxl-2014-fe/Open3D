@@ -216,12 +216,11 @@ std::tuple<Tensor, Tensor, Tensor> NearestNeighborSearch::HybridSearchSqueezed(
 
 std::tuple<Tensor, Tensor, Tensor> NearestNeighborSearch::KnnSearchSqueezed(
         const Tensor& query_points, double radius) {
-        if (nanoflann_index_) {
-            return nanoflann_index_->SearchHybridSqueezed(query_points, radius);
-        } else {
-            utility::LogError(
-                    "[NearestNeighborSearch::HybridSearch] Index is not set.");
-        }
+    if (nanoflann_index_) {
+        return nanoflann_index_->SearchHybridSqueezed(query_points, radius);
+    } else {
+        utility::LogError(
+                "[NearestNeighborSearch::HybridSearch] Index is not set.");
     }
 }
 

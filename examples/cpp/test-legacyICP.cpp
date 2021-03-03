@@ -67,7 +67,6 @@ void VisualizeRegistration(const open3d::geometry::PointCloud &source,
                                   "Registration result");
 }
 
-
 int main(int argc, char *argv[]) {
     // Argument 1: Path to the source PointCloud
     // Argument 2: Path to the target PointCloud
