@@ -139,6 +139,9 @@ public:
     std::tuple<Tensor, Tensor, Tensor> HybridSearchSqueezed(
             const Tensor &query_points, double radius);
 
+    std::tuple<Tensor, Tensor, Tensor> KnnSearchSqueezed(
+            const Tensor &query_points, double radius);
+
 private:
     bool SetIndex();
 

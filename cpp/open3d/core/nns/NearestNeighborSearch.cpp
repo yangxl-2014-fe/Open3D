@@ -214,6 +214,17 @@ std::tuple<Tensor, Tensor, Tensor> NearestNeighborSearch::HybridSearchSqueezed(
     }
 }
 
+std::tuple<Tensor, Tensor, Tensor> NearestNeighborSearch::KnnSearchSqueezed(
+        const Tensor& query_points, double radius) {
+        if (nanoflann_index_) {
+            return nanoflann_index_->SearchHybridSqueezed(query_points, radius);
+        } else {
+            utility::LogError(
+                    "[NearestNeighborSearch::HybridSearch] Index is not set.");
+        }
+    }
+}
+
 void NearestNeighborSearch::AssertNotCUDA(const Tensor& t) const {
     if (t.GetDevice().GetType() == Device::DeviceType::CUDA) {
         utility::LogError(
