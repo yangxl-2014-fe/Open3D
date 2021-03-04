@@ -124,7 +124,7 @@ int main(int argc, char *argv[]) {
     auto reg_p2plane = open3d::t::pipelines::registration::RegistrationICP(
             source_device, target_device, max_correspondence_dist, init_trans,
             open3d::t::pipelines::registration::
-                    TransformationEstimationPointToPoint(),
+                    TransformationEstimationPointToPlane(),
             open3d::t::pipelines::registration::ICPConvergenceCriteria(
                     relative_fitness, relative_rmse, max_iterations));
     icp_p2plane_time.Stop();
