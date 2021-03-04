@@ -34,6 +34,17 @@ namespace t {
 namespace geometry {
 
 void ICPBenchmark(benchmark::State& state, const core::Device& device) {
+    core::Tensor source_points_contiguous = core::Tensor::Load(
+            TEST_DATA_DIR "/icp_benchmark/source_points.npy");
+    core::Tensor target_points_contiguous = core::Tensor::Load(
+            TEST_DATA_DIR "/icp_benchmark/target_points.npy");
+    core::Tensor target_normals_contiguous = core::Tensor::Load(
+            TEST_DATA_DIR "/icp_benchmark/target_normals.npy");
+    core::Tensor corres_first_contiguous =
+            core::Tensor::Load(TEST_DATA_DIR "/icp_benchmark/corres_first.npy");
+    core::Tensor corres_second_contiguous = core::Tensor::Load(
+            TEST_DATA_DIR "/icp_benchmark/corres_second.npy");
+
     int64_t num_points = 1000000;  // 1M
     PointCloud pcd(device);
     pcd.SetPoints(core::Tensor({num_points, 3}, core::Dtype::Float32, device));
