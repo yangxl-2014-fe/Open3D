@@ -45,6 +45,16 @@ void ComputePosePointToPlaneCPU(const float *src_pcd_ptr,
                                 const core::Dtype dtype,
                                 const core::Device device);
 
+void ComputePosePointToPlaneTBB(const float *src_pcd_ptr,
+                                const float *tar_pcd_ptr,
+                                const float *tar_norm_ptr,
+                                const int64_t *corres_first,
+                                const int64_t *corres_second,
+                                const int n,
+                                core::Tensor &pose,
+                                const core::Dtype dtype,
+                                const core::Device device);
+
 #ifdef BUILD_CUDA_MODULE
 void ComputePosePointToPlaneCUDA(const float *src_pcd_ptr,
                                  const float *tar_pcd_ptr,

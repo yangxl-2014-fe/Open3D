@@ -46,8 +46,8 @@
 using namespace open3d;
 
 // Parameters to adjust according to the test pointcloud.
-double voxel_downsample_factor = 0.1;
-double max_correspondence_dist = 0.02;
+// double voxel_downsample_factor = 0.1;
+double max_correspondence_dist = 3.0;
 
 // ICP ConvergenceCriteria:
 double relative_fitness = 1e-6;
@@ -72,7 +72,7 @@ int main(int argc, char *argv[]) {
     geometry::PointCloud legacy_t = target_.ToLegacyPointCloud();
 
     // legacy_s.VoxelDownSample(voxel_downsample_factor);
-    legacy_t = *legacy_t.VoxelDownSample(voxel_downsample_factor);
+    // legacy_t = *legacy_t.VoxelDownSample(voxel_downsample_factor);
     utility::LogInfo(" Downsampling Successful ");
 
     legacy_t.EstimateNormals(open3d::geometry::KDTreeSearchParamKNN(), false);
