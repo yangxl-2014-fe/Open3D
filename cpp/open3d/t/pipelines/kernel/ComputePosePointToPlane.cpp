@@ -46,6 +46,7 @@ core::Tensor ComputePosePointToPlane(
     core::Dtype dtype = source_points.GetDtype();
     core::Device device = source_points.GetDevice();
 
+    // Checks.
     target_points.AssertDtype(dtype);
     target_normals.AssertDtype(dtype);
     target_points.AssertDevice(device);
@@ -56,6 +57,7 @@ core::Tensor ComputePosePointToPlane(
     // Number of correspondences.
     int n = corres.first.GetShape()[0];
 
+    // Pointer to point cloud data - indexed according to correspondences.
     // Pointer to point cloud data - indexed according to correspondences.
     core::Tensor source_points_contiguous = source_points.Contiguous();
     core::Tensor target_points_contiguous = target_points.Contiguous();
@@ -70,18 +72,12 @@ core::Tensor ComputePosePointToPlane(
     const int64_t *corres_second =
             corres_second_contiguous.GetDataPtr<int64_t>();
 
-    time_preparation0.Stop();
-    utility::LogInfo("   Preparation: {}", time_preparation0.GetDuration());
-
     core::Device::DeviceType device_type = device.GetType();
     if (device_type == core::Device::DeviceType::CPU) {
         time_calling_function.Start();
         ComputePosePointToPlaneCPU(src_pcd_ptr, tar_pcd_ptr, tar_norm_ptr,
                                       corres_first, corres_second, n, pose,
                                       dtype, device);
-        time_calling_function.Stop();
-        utility::LogInfo("   Calling Function: {}",
-                         time_calling_function.GetDuration());
     } else if (device_type == core::Device::DeviceType::CUDA) {
 #ifdef BUILD_CUDA_MODULE
         ComputePosePointToPlaneCUDA(src_pcd_ptr, tar_pcd_ptr, tar_norm_ptr,

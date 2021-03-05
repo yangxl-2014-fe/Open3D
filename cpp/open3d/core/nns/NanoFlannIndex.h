@@ -161,7 +161,7 @@ public:
                                            double radius,
                                            int max_knn) const override;
 
-    std::tuple<Tensor, Tensor, Tensor> SearchHybridSqueezed(
+    std::tuple<Tensor, Tensor, Tensor> SearchSqueezedHybrid(
             const Tensor &query_points, double radius) const;
 
 protected:

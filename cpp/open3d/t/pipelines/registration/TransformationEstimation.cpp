@@ -51,8 +51,10 @@ double TransformationEstimationPointToPoint::ComputeRMSE(
 
     double error;
     // TODO: Revist to support Float32 and 64 without type conversion.
-    core::Tensor source_select = source.GetPoints().IndexGet({corres.first});
-    core::Tensor target_select = target.GetPoints().IndexGet({corres.second});
+    core::Tensor source_select =
+            source.GetPoints().IndexGet({corres.first.Reshape({-1})});
+    core::Tensor target_select =
+            target.GetPoints().IndexGet({corres.second.Reshape({-1})});
 
     core::Tensor error_t = (source_select - target_select);
     error_t.Mul_(error_t);
@@ -153,17 +155,19 @@ double TransformationEstimationPointToPlane::ComputeRMSE(
     }
 
     if (!target.HasPointNormals()) return 0.0;
-
-    core::Tensor source_select = source.GetPoints().IndexGet({corres.first});
-    core::Tensor target_select = target.GetPoints().IndexGet({corres.second});
+    // TODO: Update to new scheme.
+    core::Tensor source_select =
+            source.GetPoints().IndexGet({corres.first.Reshape({-1})});
+    core::Tensor target_select =
+            target.GetPoints().IndexGet({corres.second.Reshape({-1})});
     core::Tensor target_n_select =
-            target.GetPointNormals().IndexGet({corres.second});
+            target.GetPointNormals().IndexGet({corres.second.Reshape({-1})});
 
     core::Tensor error_t =
             (source_select - target_select).Mul_(target_n_select);
     error_t.Mul_(error_t);
     double error = static_cast<double>(error_t.Sum({0, 1}).Item<float>());
-    return std::sqrt(error / static_cast<double>(corres.second.GetShape()[0]));
+    st(error / static_cast<double>(corres.second.GetShape()[0]));
 }
 
 core::Tensor TransformationEstimationPointToPlane::ComputeTransformation(

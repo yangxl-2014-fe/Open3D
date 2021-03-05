@@ -80,7 +80,7 @@ static RegistrationResult GetRegistrationResultAndCorrespondences(
     core::Tensor distances;
     std::tie(result.correspondence_set.first, result.correspondence_set.second,
              distances) =
-            target_nns.HybridSearchSqueezed(source.GetPoints(),
+            target_nns.SqueezedHybridSearch(source.GetPoints(),
                                             max_correspondence_distance);
 
     time_Search.Stop();
@@ -184,15 +184,12 @@ RegistrationResult RegistrationICP(const geometry::PointCloud &source,
 
         utility::Timer time_registrationICP, time_getCorres,
                 time_computeTransformation;
-        utility::LogInfo("     GetRegistrationResultAndCorrespondences: {}",
                          getCorresTimePrev);
 
         time_registrationICP.Start();
         time_computeTransformation.Start();
 
         core::Tensor update = estimation.ComputeTransformation(
-                source_transformed, target, corres);
-
         transformation_device = update.Matmul(transformation_device);
 
         time_computeTransformation.Stop();
@@ -204,7 +201,6 @@ RegistrationResult RegistrationICP(const geometry::PointCloud &source,
         double prev_inliner_rmse_ = result.inlier_rmse_;
 
         time_getCorres.Start();
-
         result = GetRegistrationResultAndCorrespondences(
                 source_transformed, target, target_nns,
                 max_correspondence_distance, transformation_device);

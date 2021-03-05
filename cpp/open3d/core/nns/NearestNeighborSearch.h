@@ -136,10 +136,7 @@ public:
     /// \param radius Radius.
     /// \param squeeze If true, returns tuple of {C,1} tensors, instead of
     /// {N,1}.
-    std::tuple<Tensor, Tensor, Tensor> HybridSearchSqueezed(
-            const Tensor &query_points, double radius);
-
-    std::tuple<Tensor, Tensor, Tensor> KnnSearchSqueezed(
+    std::tuple<Tensor, Tensor, Tensor> SqueezedHybridSearch(
             const Tensor &query_points, double radius);
 
 private:
