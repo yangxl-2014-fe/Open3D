@@ -55,6 +55,7 @@ void ComputePosePointToPlaneCUDA(const float *source_points_ptr,
     core::Tensor atbi = core::Tensor::Empty({n, 6}, solve_dtype, device);
     float *atbi_ptr = atbi.GetDataPtr<float>();
 
+    utility::Timer time_kernel;
     time_kernel.Start();
     // This kernel computes the {n,21} shape atai tensor
     // and {n,6} shape atbi tensor.
@@ -98,8 +99,9 @@ void ComputePosePointToPlaneCUDA(const float *source_points_ptr,
 
     time_kernel.Stop();
     utility::LogInfo("         Kernel (Get N,21 ATA): {}",
-                     time_reduction.GetDuration());
+                     time_kernel.GetDuration());
 
+    utility::Timer time_reduction;
     time_reduction.Start();
     // Reduce matrix atai (to 1x21) and atbi (to ATB.T() 1x6).
     core::Tensor ata_1x21 = atai.Sum({0}, true);

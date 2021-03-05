@@ -117,7 +117,8 @@ int main(int argc, char *argv[]) {
 
     // t::pipelines::registration::RegistrationResult evaluation(trans);
     // evaluation = open3d::t::pipelines::registration::EvaluateRegistration(
-    //         source_device, target_device, max_correspondence_dist, init_trans);
+    //         source_device, target_device, max_correspondence_dist,
+    //         init_trans);
     // utility::LogInfo(" EvaluateRegistration Success ");
 
     // ICP: Point to Plane

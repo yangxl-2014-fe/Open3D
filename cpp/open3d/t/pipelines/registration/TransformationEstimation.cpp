@@ -167,7 +167,7 @@ double TransformationEstimationPointToPlane::ComputeRMSE(
             (source_select - target_select).Mul_(target_n_select);
     error_t.Mul_(error_t);
     double error = static_cast<double>(error_t.Sum({0, 1}).Item<float>());
-    st(error / static_cast<double>(corres.second.GetShape()[0]));
+    return std::sqrt(error / static_cast<double>(corres.second.GetShape()[0]));
 }
 
 core::Tensor TransformationEstimationPointToPlane::ComputeTransformation(

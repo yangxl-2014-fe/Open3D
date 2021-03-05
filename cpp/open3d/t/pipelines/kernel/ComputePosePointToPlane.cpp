@@ -76,8 +76,8 @@ core::Tensor ComputePosePointToPlane(
     if (device_type == core::Device::DeviceType::CPU) {
         time_calling_function.Start();
         ComputePosePointToPlaneCPU(src_pcd_ptr, tar_pcd_ptr, tar_norm_ptr,
-                                      corres_first, corres_second, n, pose,
-                                      dtype, device);
+                                   corres_first, corres_second, n, pose, dtype,
+                                   device);
     } else if (device_type == core::Device::DeviceType::CUDA) {
 #ifdef BUILD_CUDA_MODULE
         ComputePosePointToPlaneCUDA(src_pcd_ptr, tar_pcd_ptr, tar_norm_ptr,

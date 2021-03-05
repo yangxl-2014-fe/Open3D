@@ -184,12 +184,13 @@ RegistrationResult RegistrationICP(const geometry::PointCloud &source,
 
         utility::Timer time_registrationICP, time_getCorres,
                 time_computeTransformation;
+        utility::LogInfo("      GetRegistrationResultAndCorrespondences: {}",
                          getCorresTimePrev);
-
         time_registrationICP.Start();
         time_computeTransformation.Start();
 
         core::Tensor update = estimation.ComputeTransformation(
+                source_transformed, target, corres);
         transformation_device = update.Matmul(transformation_device);
 
         time_computeTransformation.Stop();
