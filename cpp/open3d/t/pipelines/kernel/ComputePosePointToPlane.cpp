@@ -27,6 +27,7 @@
 #include "open3d/t/pipelines/kernel/ComputePosePointToPlane.h"
 
 #include "open3d/t/pipelines/kernel/ComputePosePointToPlaneImp.h"
+#include "open3d/utility/Timer.h"
 
 namespace open3d {
 namespace t {
@@ -38,6 +39,9 @@ core::Tensor ComputePosePointToPlane(
         const core::Tensor &target_points,
         const core::Tensor &target_normals,
         const pipelines::registration::CorrespondenceSet &corres) {
+    utility::Timer time_preparation0, time_calling_function;
+    time_preparation0.Start();
+
     // Get dtype and device.
     core::Dtype dtype = source_points.GetDtype();
     core::Device device = source_points.GetDevice();
@@ -59,23 +63,25 @@ core::Tensor ComputePosePointToPlane(
     core::Tensor corres_first_contiguous = corres.first.Contiguous();
     core::Tensor corres_second_contiguous = corres.second.Contiguous();
 
-    const float *src_pcd_ptr =
-            static_cast<const float *>(source_points_contiguous.GetDataPtr());
-    const float *tar_pcd_ptr =
-            static_cast<const float *>(target_points_contiguous.GetDataPtr());
-    const float *tar_norm_ptr =
-            static_cast<const float *>(target_normals_contiguous.GetDataPtr());
-
-    const int64_t *corres_first =
-            static_cast<const int64_t *>(corres_first_contiguous.GetDataPtr());
+    const float *src_pcd_ptr = source_points_contiguous.GetDataPtr<float>();
+    const float *tar_pcd_ptr = target_points_contiguous.GetDataPtr<float>();
+    const float *tar_norm_ptr = target_normals_contiguous.GetDataPtr<float>();
+    const int64_t *corres_first = corres_first_contiguous.GetDataPtr<int64_t>();
     const int64_t *corres_second =
-            static_cast<const int64_t *>(corres_second_contiguous.GetDataPtr());
+            corres_second_contiguous.GetDataPtr<int64_t>();
+
+    time_preparation0.Stop();
+    utility::LogInfo("   Preparation: {}", time_preparation0.GetDuration());
 
     core::Device::DeviceType device_type = device.GetType();
     if (device_type == core::Device::DeviceType::CPU) {
+        time_calling_function.Start();
         ComputePosePointToPlaneCPU(src_pcd_ptr, tar_pcd_ptr, tar_norm_ptr,
-                                   corres_first, corres_second, n, pose, dtype,
-                                   device);
+                                      corres_first, corres_second, n, pose,
+                                      dtype, device);
+        time_calling_function.Stop();
+        utility::LogInfo("   Calling Function: {}",
+                         time_calling_function.GetDuration());
     } else if (device_type == core::Device::DeviceType::CUDA) {
 #ifdef BUILD_CUDA_MODULE
         ComputePosePointToPlaneCUDA(src_pcd_ptr, tar_pcd_ptr, tar_norm_ptr,
@@ -87,6 +93,7 @@ core::Tensor ComputePosePointToPlane(
     } else {
         utility::LogError("Unimplemented device.");
     }
+
     return pose;
 }
 

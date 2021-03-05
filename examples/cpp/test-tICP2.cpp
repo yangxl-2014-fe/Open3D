@@ -46,8 +46,8 @@
 using namespace open3d;
 
 // Parameters to adjust according to the test pointcloud.
-double voxel_downsample_factor = 0.001;
-double max_correspondence_dist = 10.0;
+double voxel_downsample_factor = 0.1;
+double max_correspondence_dist = 5.0;
 
 // ICP ConvergenceCriteria:
 double relative_fitness = 1e-6;
@@ -115,10 +115,10 @@ int main(int argc, char *argv[]) {
 
     utility::LogInfo(" Input Process on {} Success", device.ToString());
 
-    // t::pipelines::registration::RegistrationResult evaluation(trans);
-    // evaluation = open3d::t::pipelines::registration::EvaluateRegistration(
-    //         source_device, target_device, max_correspondence_dist, init_trans);
-    // utility::LogInfo(" EvaluateRegistration Success ");
+    t::pipelines::registration::RegistrationResult evaluation(trans);
+    evaluation = open3d::t::pipelines::registration::EvaluateRegistration(
+            source_device, target_device, max_correspondence_dist, init_trans);
+    utility::LogInfo(" EvaluateRegistration Success ");
 
     // ICP: Point to Plane
     utility::Timer icp_p2plane_time;
