@@ -43,6 +43,10 @@ set(BENCHMARK_SOURCE_FILES
     geometry/SamplePoints.cpp
     io/PointCloudIO.cpp
     tgeometry/PointCloud.cpp
+    pipelines/registration/ICP.cpp
+    t/pipelines/registration/ICP.cpp
+    t/pipelines/registration/ComputeTransform.cpp
+    t/pipelines/registration/GetRegistrationResultAndCorrespondences.cpp
 )
 
 add_executable(benchmarks ${BENCHMARK_SOURCE_FILES})
