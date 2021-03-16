@@ -42,11 +42,9 @@ set(BENCHMARK_SOURCE_FILES
     geometry/KDTreeFlann.cpp
     geometry/SamplePoints.cpp
     io/PointCloudIO.cpp
+    pipelines/registration/Registration.cpp
     tgeometry/PointCloud.cpp
-    pipelines/registration/ICP.cpp
-    t/pipelines/registration/ICP.cpp
-    t/pipelines/registration/ComputeTransform.cpp
-    t/pipelines/registration/GetRegistrationResultAndCorrespondences.cpp
+    t/pipelines/registration/Registration.cpp
 )
 
 add_executable(benchmarks ${BENCHMARK_SOURCE_FILES})
