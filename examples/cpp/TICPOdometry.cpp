@@ -24,14 +24,14 @@
 // IN THE SOFTWARE.
 // ----------------------------------------------------------------------------
 
-// This is an example for Multi-Scale ICP Registration.
+// This is an example of Multi-Scale ICP Registration.
 // This takes a config.txt file, an example of which is provided in
-// Open3D/examples/test_data/ICP/TMultiScaleICPConfig.txt.
+// Open3D/examples/test_data/ICP/TMultiScaleICPRegConfig.txt.
 //
-// Command to run this from Open3D build directory:
-// ./bin/examples/TICPRegistration [Device] [Path to Config]
+// To run this from build directory use the following command:
+// build$ ./bin/examples/TICPRegistration [Device] [Path to Config]
 // [Device]: CPU:0 / CUDA:0 ...
-// [Sample Config Path]: ../examples/test_data/ICP/TMultiScaleICPConfig.txt
+// [Sample Config Path]: ../examples/test_data/ICP/TMultiScaleICPRegConfig.txt
 
 #include <fstream>
 #include <sstream>
@@ -41,24 +41,22 @@
 using namespace open3d;
 using namespace open3d::t::pipelines::registration;
 
+int end_range = 100;
+bool visualize_output = false;
+
 // For each frame registration using MultiScaleICP.
 std::vector<double> voxel_sizes;
 std::vector<double> search_radius;
 std::vector<ICPConvergenceCriteria> criterias;
 
 std::string path_config_file;
-std::string path_source;
-std::string path_target;
+std::string path_dataset;
 std::string registration_method;
 std::string verbosity;
 
-// Initial transformation guess for registation.
-// std::vector<float> initial_transform_flat = {
-//         0.862, 0.011, -0.507, 0.5,  -0.139, 0.967, -0.215, 0.7,
-//         0.487, 0.255, 0.835,  -1.4, 0.0,    0.0,   0.0,    1.0};
-std::vector<float> initial_transform_flat = {1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
-                                             0.0, 0.0, 0.0, 0.0, 1.0, 0.0,
-                                             0.0, 0.0, 0.0, 1.0};
+// Ground Truth value of odometry after (end_range - 1)th iteration.
+double gt_tx = 0;
+double gt_ty = 0;
 
 void PrintHelp() {
     PrintOpen3DVersion();
@@ -67,11 +65,11 @@ void PrintHelp() {
 }
 
 void ReadConfigFile() {
-    std::ifstream cFile(path_config_file);
     std::vector<double> relative_fitness;
     std::vector<double> relative_rmse;
     std::vector<int> max_iterations;
 
+    std::ifstream cFile(path_config_file);
     if (cFile.is_open()) {
         std::string line;
         while (getline(cFile, line)) {
@@ -83,10 +81,11 @@ void ReadConfigFile() {
             auto name = line.substr(0, delimiterPos);
             auto value = line.substr(delimiterPos + 1);
 
-            if (name == "source_path") {
-                path_source = value;
-            } else if (name == "target_path") {
-                path_target = value;
+            if (name == "dataset_path") {
+                path_dataset = value;
+            } else if (name == "end_range") {
+                std::istringstream is(value);
+                end_range = std::stoi(value);
             } else if (name == "registration_method") {
                 registration_method = value;
             } else if (name == "criteria.relative_fitness") {
@@ -107,24 +106,25 @@ void ReadConfigFile() {
             } else if (name == "verbosity") {
                 std::istringstream is(value);
                 verbosity = value;
+            } else if (name == "ground_truth_tx") {
+                std::istringstream is(value);
+                gt_tx = std::stod(value);
+            } else if (name == "ground_truth_ty") {
+                std::istringstream is(value);
+                gt_ty = std::stod(value);
             }
         }
     } else {
         std::cerr << "Couldn't open config file for reading.\n";
     }
 
-    utility::LogInfo(" Source path: {}", path_source);
-    utility::LogInfo(" Target path: {}", path_target);
-    utility::LogInfo(" Registrtion method: {}", registration_method);
-    std::cout << std::endl;
-
-    std::cout << " Initial Transformation Guess: " << std::endl;
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 4; j++) {
-            std::cout << " " << initial_transform_flat[i * 4 + j];
-        }
-        std::cout << std::endl;
+    utility::LogInfo(" Dataset path: {}", path_dataset);
+    if (end_range > 500) {
+        utility::LogWarning(" Too large range. Memory might exceed.");
     }
+    utility::LogInfo(" Range: 0 to {} pointcloud files in sequence.",
+                     end_range - 1);
+    utility::LogInfo(" Registrtion method: {}", registration_method);
     std::cout << std::endl;
 
     std::cout << " Voxel Sizes: ";
@@ -183,39 +183,61 @@ void VisualizeRegistration(const open3d::t::geometry::PointCloud &source,
                                   window_name);
 }
 
-std::tuple<t::geometry::PointCloud, t::geometry::PointCloud>
-LoadTensorPointClouds(const core::Device &device, const core::Dtype &dtype) {
-    t::geometry::PointCloud source, target;
+std::vector<open3d::t::geometry::PointCloud> LoadPointCloudsCPU(
+        core::Device &device) {
+    std::vector<std::string> filename;
+    core::Dtype dtype = core::Dtype::Float32;
 
-    // t::io::ReadPointCloud copies the pointcloud to CPU.
-    t::io::ReadPointCloud(path_source, source, {"auto", false, false, true});
-    t::io::ReadPointCloud(path_target, target, {"auto", false, false, true});
+    for (int i = 0; i < end_range; i++) {
+        filename.push_back(path_dataset + std::to_string(i) +
+                           std::string(".pcd"));
+    }
 
-    // Currently only Float32 pointcloud is supported.
-    source = source.To(device);
-    target = target.To(device);
+    std::vector<t::geometry::PointCloud> pointclouds_device(filename.size());
 
-    for (std::string attr : {"points", "colors", "normals"}) {
-        if (source.HasPointAttr(attr)) {
-            source.SetPointAttr(attr, source.GetPointAttr(attr).To(dtype));
+    try {
+        int i = 0;
+        t::geometry::PointCloud pointcloud_local;
+        for (auto &path : filename) {
+            t::io::ReadPointCloud(path, pointcloud_local,
+                                  {"auto", false, false, true});
+            // Device transfer.
+            pointcloud_local = pointcloud_local.To(device);
+            // Dtype conversion to Float32. Currently only Float32 pointcloud is
+            // supported.
+            for (std::string attr : {"points", "colors", "normals"}) {
+                if (pointcloud_local.HasPointAttr(attr)) {
+                    pointcloud_local.SetPointAttr(
+                            attr,
+                            pointcloud_local.GetPointAttr(attr).To(dtype));
+                }
+            }
+            // Normal Estimation. Currenly Normal Estimation is not supported by
+            // Tensor Pointcloud.
+            if (registration_method == "PointToPoint" &&
+                !pointcloud_local.HasPointNormals()) {
+                auto pointcloud_legacy = pointcloud_local.ToLegacyPointCloud();
+                pointcloud_legacy.EstimateNormals(
+                        open3d::geometry::KDTreeSearchParamKNN(), false);
+                core::Tensor pointcloud_normals =
+                        t::geometry::PointCloud::FromLegacyPointCloud(
+                                pointcloud_legacy)
+                                .GetPointNormals()
+                                .To(device, dtype);
+                pointcloud_local.SetPointNormals(pointcloud_normals);
+            }
+            // Adding it to our vector of pointclouds.
+            pointclouds_device[i++] = pointcloud_local.Clone();
         }
+    } catch (...) {
+        utility::LogError(
+                " Failed to read pointcloud in sequence. Ensure pointcloud "
+                "files are present in the given dataset path in continuous "
+                "sequence from 0 to {}. Also, in case of large range, the "
+                "system might be going out-of-memory. ",
+                end_range);
     }
-    for (std::string attr : {"points", "colors", "normals"}) {
-        if (target.HasPointAttr(attr)) {
-            target.SetPointAttr(attr, target.GetPointAttr(attr).To(dtype));
-        }
-    }
-
-    if (registration_method == "PointToPlane" && !target.HasPointNormals()) {
-        auto target_legacy = target.ToLegacyPointCloud();
-        target_legacy.EstimateNormals(geometry::KDTreeSearchParamKNN(), false);
-        core::Tensor target_normals =
-                t::geometry::PointCloud::FromLegacyPointCloud(target_legacy)
-                        .GetPointNormals()
-                        .To(device, dtype);
-        target.SetPointNormals(target_normals);
-    }
-    return std::make_tuple(source, target);
+    return pointclouds_device;
 }
 
 int main(int argc, char *argv[]) {
@@ -225,12 +247,12 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    core::Device device = core::Device(argv[1]);
-    core::Dtype dtype = core::Dtype::Float32;
+    auto device = core::Device(argv[1]);
     path_config_file = std::string(argv[2]);
     ReadConfigFile();
+    std::vector<open3d::t::geometry::PointCloud> pointclouds_host;
+    auto pointcloud_device = LoadPointCloudsCPU(device);
 
-    // Verbosity can be changes in the config file.
     utility::VerbosityLevel verb;
     if (verbosity == "Debug") {
         verb = utility::VerbosityLevel::Debug;
@@ -238,10 +260,6 @@ int main(int argc, char *argv[]) {
         verb = utility::VerbosityLevel::Info;
     }
     utility::SetVerbosityLevel(verb);
-
-    // Load pointcloud from path into device.
-    t::geometry::PointCloud source(device), target(device);
-    std::tie(source, target) = LoadTensorPointClouds(device, dtype);
 
     std::shared_ptr<TransformationEstimation> estimation;
     if (registration_method == "PointToPoint") {
@@ -253,36 +271,68 @@ int main(int argc, char *argv[]) {
                           registration_method);
     }
 
-    core::Tensor initial_transformation =
-            core::Tensor(initial_transform_flat, {4, 4}, dtype, device);
-    utility::Timer time_multiscaleICP;
+    // Warm up.
+    auto pointcloud_warmup = pointcloud_device[0];
+    // Getting dtype.
+    auto dtype = pointcloud_warmup.GetPoints().GetDtype();
 
-    t::pipelines::registration::RegistrationResult result(
-            initial_transformation);
-
-    // Warm Up.
-    std::vector<ICPConvergenceCriteria> warm_up_criteria = {
-            ICPConvergenceCriteria(0.01, 0.01, 1)};
-    result = RegistrationICPMultiScale(
-            source, target, {1.0}, warm_up_criteria, {1.5},
+    auto result = RegistrationICPMultiScale(
+            pointcloud_warmup, pointcloud_warmup, {0.05},
+            {ICPConvergenceCriteria(0.01, 0.01, 1)}, {0.1},
             core::Tensor::Eye(4, dtype, device), *estimation);
 
-    VisualizeRegistration(source, target, initial_transformation,
-                          " Before Registration ");
+    core::Tensor initial_transform = core::Tensor::Eye(4, dtype, device);
+    core::Tensor cumulative_transform = initial_transform.Clone();
 
-    time_multiscaleICP.Start();
-    result = RegistrationICPMultiScale(source, target, voxel_sizes, criterias,
-                                       search_radius, initial_transformation,
-                                       *estimation);
-    time_multiscaleICP.Stop();
+    double total_processing_time = 0;
+    for (int i = 0; i < end_range - 1; i++) {
+        utility::Timer time_icp_odom_loop;
+        time_icp_odom_loop.Start();
+        auto source = pointcloud_device[i];
+        auto target = pointcloud_device[i + 1];
 
-    utility::LogInfo(
-            " Total Time: {}, Fitness: {}, RMSE: {}, \n Transformation: \n{}\n",
-            time_multiscaleICP.GetDuration(), result.fitness_,
-            result.inlier_rmse_, result.transformation_.ToString());
+        result = RegistrationICPMultiScale(source, target, voxel_sizes,
+                                           criterias, search_radius,
+                                           initial_transform, *estimation);
 
-    VisualizeRegistration(source, target, result.transformation_,
-                          " After Registration ");
+        cumulative_transform =
+                cumulative_transform.Matmul(result.transformation_.Inverse());
+
+        time_icp_odom_loop.Stop();
+        total_processing_time += time_icp_odom_loop.GetDuration();
+        if (visualize_output) {
+            VisualizeRegistration(source, target, result.transformation_,
+                                  " Registration of " + std::to_string(i) +
+                                          " and " + std::to_string(i + 1) +
+                                          " frame.");
+        }
+        utility::LogDebug(" Registraion took: {}",
+                          time_icp_odom_loop.GetDuration());
+        utility::LogDebug(" Cumulative Transformation: \n{}\n",
+                          cumulative_transform.ToString());
+    }
+
+    utility::LogInfo(" \n\n Transformation: \n{}\n",
+                     cumulative_transform.ToString());
+
+    if (gt_tx > 0.001 && gt_ty > 0.001) {
+        double tx = (double)cumulative_transform[0][3].Item<float>();
+        double ty = (double)cumulative_transform[1][3].Item<float>();
+        double drift_x = std::abs(tx - gt_tx);
+        double perct_drift_x = drift_x * 100 / gt_tx;
+        double drift_y = std::abs(ty - gt_ty);
+        double perct_error_y = drift_y * 100 / gt_ty;
+        double cumulative_rmse =
+                std::sqrt(drift_x * drift_x + drift_y + drift_y);
+        double error_perct = 100 * cumulative_rmse /
+                             std::sqrt(gt_tx * gt_tx + gt_ty * gt_ty);
+        utility::LogInfo(" Drift  x: {}%, y: {}%, RMSE: {}, Error %: {}%",
+                         perct_drift_x, perct_error_y, cumulative_rmse,
+                         error_perct);
+    }
+    double average_fps = 1000 * end_range / total_processing_time;
+    utility::LogInfo(" Total Time for {} frames: {}, Average FPS: {}.",
+                     end_range, total_processing_time, average_fps);
 
     return 0;
 }
