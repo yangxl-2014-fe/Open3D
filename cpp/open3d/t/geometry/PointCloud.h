@@ -107,7 +107,7 @@ public:
     /// raise an exception.
     PointCloud(const core::Tensor &points);
 
-    PointCloud(const PointCloud& other);
+    PointCloud(const PointCloud &other);
 
     /// Construct from points and other attributes of the points.
     ///

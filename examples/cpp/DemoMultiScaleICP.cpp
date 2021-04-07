@@ -37,7 +37,9 @@ void CopyPointCloud(std::shared_ptr<t::geometry::PointCloud> pcd_ptr,
                     core::Device device);
 
 void LoadTensorPointClouds(std::shared_ptr<t::geometry::PointCloud> source_ptr,
-            std::shared_ptr<t::geometry::PointCloud> target_ptr, core::Dtype dtype, core::Device device);
+                           std::shared_ptr<t::geometry::PointCloud> target_ptr,
+                           core::Dtype dtype,
+                           core::Device device);
 
 void VisualizeRegistration() {
     auto source_ptr = std::make_shared<t::geometry::PointCloud>(device);
@@ -52,7 +54,8 @@ void VisualizeRegistration() {
     // const char *source_name = "Source (yellow)";
     // const char *target_name = "Target (blue)";
 
-    // t::pipelines::registration::RegistrationResult result(initial_transformation);
+    // t::pipelines::registration::RegistrationResult
+    // result(initial_transformation);
 
     // std::shared_ptr<TransformationEstimation> estimation;
     // if (registration_method == "PointToPoint") {
@@ -67,7 +70,7 @@ void VisualizeRegistration() {
     // }
 
     // // Warm Up.
-    // result = RegistrationICPMultiScale(
+    // result = RegistrationMultiScaleICP(
     //         *source_ptr, *source_ptr, {1.0},  {ICPConvergenceCriteria(0.01,
     //         0.01, 1)}, {1.5}, core::Tensor::Eye(4, dtype, device),
     //         *estimation);
@@ -78,7 +81,7 @@ void VisualizeRegistration() {
     //          target_name](visualization::visualizer::O3DVisualizer &o3dvis) {
     //             t::pipelines::registration::RegistrationResult result(
     //                     initial_transformation);
-    //             result = RegistrationICPMultiScale(*source_ptr, *target_ptr,
+    //             result = RegistrationMultiScaleICP(*source_ptr, *target_ptr,
     //                             voxel_sizes, criterias,
     //                             search_radius, initial_transformation,
     //                             *estimation);
@@ -144,7 +147,9 @@ void CopyPointCloud(std::shared_ptr<t::geometry::PointCloud> pcd_ptr,
 // std::tuple<std::shared_ptr<t::geometry::PointCloud>,
 //            std::shared_ptr<t::geometry::PointCloud>>
 void LoadTensorPointClouds(std::shared_ptr<t::geometry::PointCloud> source_ptr,
-            std::shared_ptr<t::geometry::PointCloud> target_ptr, core::Dtype dtype, core::Device device) {
+                           std::shared_ptr<t::geometry::PointCloud> target_ptr,
+                           core::Dtype dtype,
+                           core::Device device) {
     t::geometry::PointCloud source, target;
 
     // t::io::ReadPointCloud copies the pointcloud to CPU.

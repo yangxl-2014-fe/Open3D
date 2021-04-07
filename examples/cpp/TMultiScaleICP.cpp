@@ -263,7 +263,7 @@ int main(int argc, char *argv[]) {
     // Warm Up.
     std::vector<ICPConvergenceCriteria> warm_up_criteria = {
             ICPConvergenceCriteria(0.01, 0.01, 1)};
-    result = RegistrationICPMultiScale(
+    result = RegistrationMultiScaleICP(
             source, target, {1.0}, warm_up_criteria, {1.5},
             core::Tensor::Eye(4, dtype, device), *estimation);
 
@@ -271,7 +271,7 @@ int main(int argc, char *argv[]) {
                           " Before Registration ");
 
     time_multiscaleICP.Start();
-    result = RegistrationICPMultiScale(source, target, voxel_sizes, criterias,
+    result = RegistrationMultiScaleICP(source, target, voxel_sizes, criterias,
                                        search_radius, initial_transformation,
                                        *estimation);
     time_multiscaleICP.Stop();

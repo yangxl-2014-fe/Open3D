@@ -49,7 +49,7 @@ PointCloud::PointCloud(const core::Device &device)
     ;
 }
 
-PointCloud::PointCloud(const PointCloud& other)     
+PointCloud::PointCloud(const PointCloud &other)
     : Geometry(Geometry::GeometryType::PointCloud, 3),
       point_attr_(other.GetPointAttr()) {
     for (auto &kv : point_attr_) {

@@ -23,7 +23,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    
+    visualization::DrawGeometries({pcd_ptr});
 
     return 0;
 }
