@@ -276,7 +276,7 @@ int main(int argc, char *argv[]) {
     // Getting dtype.
     auto dtype = pointcloud_warmup.GetPoints().GetDtype();
 
-    auto result = RegistrationICPMultiScale(
+    auto result = RegistrationMultiScaleICP(
             pointcloud_warmup, pointcloud_warmup, {0.05},
             {ICPConvergenceCriteria(0.01, 0.01, 1)}, {0.1},
             core::Tensor::Eye(4, dtype, device), *estimation);
@@ -291,7 +291,7 @@ int main(int argc, char *argv[]) {
         auto source = pointcloud_device[i];
         auto target = pointcloud_device[i + 1];
 
-        result = RegistrationICPMultiScale(source, target, voxel_sizes,
+        result = RegistrationMultiScaleICP(source, target, voxel_sizes,
                                            criterias, search_radius,
                                            initial_transform, *estimation);
 

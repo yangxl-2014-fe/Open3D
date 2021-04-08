@@ -82,6 +82,13 @@ public:
 /// Class that contains the registration results.
 class RegistrationResult {
 public:
+    /// \brief Default Constructor.
+    ///
+    RegistrationResult()
+        : transformation_(core::Tensor::Eye(
+                  4, core::Dtype::Float32, core::Device("CPU:0"))),
+          inlier_rmse_(0.0),
+          fitness_(0.0) {}
     /// \brief Parameterized Constructor.
     ///
     /// \param transformation The estimated transformation matrix.
