@@ -108,6 +108,8 @@ public:
     /// raise an exception.
     PointCloud(const core::Tensor &points);
 
+    PointCloud(const PointCloud &other);
+
     /// Construct from points and other attributes of the points.
     ///
     /// \param map_keys_to_tensors A map of string to Tensor containing

@@ -49,6 +49,14 @@ PointCloud::PointCloud(const core::Device &device)
     ;
 }
 
+PointCloud::PointCloud(const PointCloud &other)
+    : Geometry(Geometry::GeometryType::PointCloud, 3),
+      point_attr_(other.GetPointAttr()) {
+    for (auto &kv : point_attr_) {
+        SetPointAttr(kv.first, kv.second.To(other.GetDevice(), /*copy=*/true));
+    }
+}
+
 PointCloud::PointCloud(const core::Tensor &points)
     : PointCloud(points.GetDevice()) {
     points.AssertShapeCompatible({utility::nullopt, 3});
