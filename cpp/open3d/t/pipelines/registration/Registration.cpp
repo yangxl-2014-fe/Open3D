@@ -208,9 +208,6 @@ RegistrationResult RegistrationMultiScaleICP(
 
     RegistrationResult result(transformation_device);
 
-    double prev_fitness_ = 0;
-    double prev_inliner_rmse_ = 0;
-
     for (int64_t i = 0; i < num_iterations; i++) {
         source_down_pyramid[i].Transform(transformation_device);
 
@@ -236,8 +233,8 @@ RegistrationResult RegistrationMultiScaleICP(
             // Apply the transform on source pointcloud.
             source_down_pyramid[i].Transform(update);
 
-            prev_fitness_ = result.fitness_;
-            prev_inliner_rmse_ = result.inlier_rmse_;
+            double prev_fitness_ = result.fitness_;
+            double prev_inliner_rmse_ = result.inlier_rmse_;
 
             result = GetRegistrationResultAndCorrespondences(
                     source_down_pyramid[i], target_down_pyramid[i], target_nns,
