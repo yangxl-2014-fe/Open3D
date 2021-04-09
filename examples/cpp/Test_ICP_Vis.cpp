@@ -64,8 +64,8 @@ void MultiScaleICP() {
             core::Tensor::Eye(4, core::Dtype::Float32, core::Device("CPU:0"));
 
     auto DoSingleIterationICP =
-            [source, target, source_t, target_t, 
-              transformation_device](visualization::visualizer::O3DVisualizer& o3dvis) {
+            [source, target, source_t, target_t, transformation_device](
+                    visualization::visualizer::O3DVisualizer& o3dvis) {
                 std::cout << " Inside Action " << std::endl;
                 auto result = RegistrationICP(
                         source_t, target_t, 0.02, transformation_device,

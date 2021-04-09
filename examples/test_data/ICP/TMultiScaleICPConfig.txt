@@ -1,8 +1,8 @@
 # This is a config file for the examples/cpp/TICPRegistration.cpp. 
 # When voxel_size is -1, no downsampling is performed.
 
-source_path = ../examples/test_data/ICP/cloud_bin_0.pcd
-target_path = ../examples/test_data/ICP/cloud_bin_1.pcd
+source_path = ../../../examples/test_data/ICP/cloud_bin_0.pcd
+target_path = ../../../examples/test_data/ICP/cloud_bin_1.pcd
 
 registration_method = PointToPlane
 
@@ -22,7 +22,7 @@ registration_method = PointToPlane
 
  voxel_size = 0.05
  search_radii = 0.15
- criteria.relative_fitness = 0.000001
- criteria.relative_rmse = 0.000001
+ criteria.relative_fitness = 0.0001
+ criteria.relative_rmse = 0.0001
  criteria.max_iterations = 1000
  
