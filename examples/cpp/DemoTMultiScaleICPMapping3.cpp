@@ -64,7 +64,7 @@ public:
         std::cout << " [Debug] Warm up transformation: "
                   << result_.transformation_.ToString() << std::endl;
         is_done_ = false;
-        visualize_output_ = true;
+        visualize_output_ = false;
 
         SetOnClose([this]() {
             is_done_ = true;
@@ -84,57 +84,43 @@ private:
 
         // geometry::AxisAlignedBoundingBox bounds;
         auto mat = rendering::Material();
-
-        // mat.shader = "unlitSolidColor";
-
-        mat.shader = "defaultUnlit";
-
-        // mat.shader = "unlitGradient";
-        // mat.scalar_min = -10.0;
-        // mat.scalar_max = 10.0;
-
-        // mat.point_size = 0.5f;
-
-        // mat.gradient = std::make_shared<
-        //         rendering::Gradient>(std::vector<rendering::Gradient::Point>{
-        //         rendering::Gradient::Point{0.000f, {0.0f, 0.0f, 1.0f, 1.0f}},
-        //         rendering::Gradient::Point{0.125f, {0.0f, 0.5f, 1.0f, 1.0f}},
-        //         rendering::Gradient::Point{0.250f, {0.0f, 1.0f, 1.0f, 1.0f}},
-        //         rendering::Gradient::Point{0.375f, {0.0f, 1.0f, 0.5f, 1.0f}},
-        //         rendering::Gradient::Point{0.500f, {0.0f, 1.0f, 0.0f, 1.0f}},
-        //         rendering::Gradient::Point{0.625f, {0.5f, 1.0f, 0.0f, 1.0f}},
-        //         rendering::Gradient::Point{0.750f, {1.0f, 1.0f, 0.0f, 1.0f}},
-        //         rendering::Gradient::Point{0.875f, {1.0f, 0.5f, 0.0f, 1.0f}},
-        //         rendering::Gradient::Point{1.000f, {1.0f, 0.0f,
-        //         0.0f, 1.0f}}});
+        mat.shader = "unlitGradient";
 
         {
             std::lock_guard<std::mutex> lock(cloud_lock_);
             pcd_ = pointclouds_host_[0].Clone();
+            utility::LogInfo(" # PCD: {}",
+                             pcd_.GetPoints().GetShape().ToString());
         }
 
         if (visualize_output_) {
             gui::Application::GetInstance().PostToMainThread(this, [this,
-                                                                    &mat]() {
+                                                                    mat]() {
                 std::lock_guard<std::mutex> lock(cloud_lock_);
-                this->widget3d_->GetScene()->SetBackground({0, 0, 0, 1});
-                mat.point_size = 0.5f;
-                mat.base_color = Eigen::Vector4f(1.f, 1.0f, 1.0f, 0.5f);
+                utility::LogInfo(" Widget: {}, Size: {}",
+                                 widget3d_->GetFrame().width,
+                                 widget3d_->GetFrame().height);
+                utility::LogInfo(" PCD: {}",
+                                 pcd_.GetPoints().GetShape().ToString());
                 this->widget3d_->GetScene()->AddGeometry(filenames_[0], &pcd_,
                                                          mat);
+                // pcd->->PaintUniformColor({1.0, 0.0, 0.0});
+                // this->widget3d_->GetScene()->GetScene()->AddGeometry(CURRENT_CLOUD,
+                // legacy_output_, &mat);
                 auto bbox = this->widget3d_->GetScene()->GetBoundingBox();
                 auto center = bbox.GetCenter().cast<float>();
+                utility::LogInfo(" Bounding box Size: {}", bbox.GetExtent());
                 this->widget3d_->SetupCamera(60, bbox, center);
+                this->widget3d_->GetScene()->SetBackground({0, 0, 1, 1});
             });
         }
 
         for (int i = 0; i < end_range_ - 1; i++) {
             utility::Timer time_icp_odom_loop;
-
+            time_icp_odom_loop.Start();
             auto source = pointclouds_host_[i].To(device_);
             auto target = pointclouds_host_[i + 1].To(device_);
 
-            time_icp_odom_loop.Start();
             auto result = RegistrationMultiScaleICP(
                     source, target, voxel_sizes_, criterias_, search_radius_,
                     initial_transform, *estimation_);
@@ -144,54 +130,39 @@ private:
 
             time_icp_odom_loop.Stop();
             double total_processing_time = time_icp_odom_loop.GetDuration();
-            utility::LogInfo(" Registraion took: {}, for frame: {}",
-                             total_processing_time, i);
+            utility::LogDebug(" Registraion took: {}", total_processing_time);
+            utility::LogDebug(" Cumulative Transformation: \n{}\n",
+                              cumulative_transform.ToString());
 
-            if (visualize_output_ && i < end_range_ - 3) {
-                {
-                    std::lock_guard<std::mutex> lock(cloud_lock_);
-                    pcd_ = target.Transform(cumulative_transform)
-                                   .To(core::Device("CPU:0"));
-                }
+            {
+                std::lock_guard<std::mutex> lock(cloud_lock_);
+                pcd_ = target.Transform(cumulative_transform)
+                               .To(core::Device("CPU:0"), true);
 
-                gui::Application::GetInstance().PostToMainThread(this, [this,
-                                                                        &mat,
-                                                                        i]() {
-                    std::lock_guard<std::mutex> lock(cloud_lock_);
-                    utility::Timer timer;
-                    timer.Start();
-                    // utility::LogInfo(" PCD: {}",
-                    //                  pcd_.GetPoints().GetShape().ToString());
-
-                    this->widget3d_->GetScene()->RemoveGeometry(CURRENT_CLOUD);
-
-                    mat.point_size = 0.5f;
-                    mat.base_color = Eigen::Vector4f(1.f, 1.0f, 1.0f, 0.6f);
-                    this->widget3d_->GetScene()->AddGeometry(filenames_[i],
-                                                             &pcd_, mat);
-
-                    mat.point_size = 5.0f;
-                    mat.base_color = Eigen::Vector4f(1.f, 0.0f, 0.0f, 1.0f);
-                    this->widget3d_->GetScene()->AddGeometry(CURRENT_CLOUD,
-                                                             &pcd_, mat);
-
-                    utility::LogInfo(" hey ");
-                    utility::LogInfo(" Widget: {}, Size: {}",
-                                     widget3d_->GetFrame().width,
-                                     widget3d_->GetFrame().height);
-
-                    auto bbox = this->widget3d_->GetScene()->GetBoundingBox();
-                    auto center = bbox.GetCenter().cast<float>();
-                    utility::LogInfo(" Bounding box Size: {}",
-                                     bbox.GetExtent());
-                    this->widget3d_->SetupCamera(60, bbox, center);
-
-                    timer.Stop();
-                    utility::LogInfo("Update geometry takes {}",
-                                     timer.GetDuration());
-                    // is_scene_updated = false;
-                });
+                utility::LogInfo("# PCD: {}",
+                                 pcd_.GetPoints().GetShape().ToString());
             }
+
+            gui::Application::GetInstance().PostToMainThread(this, [this, &mat,
+                                                                    i]() {
+                std::lock_guard<std::mutex> lock(cloud_lock_);
+                utility::Timer timer;
+                timer.Start();
+                utility::LogInfo(" PCD: {}",
+                                 pcd_.GetPoints().GetShape().ToString());
+                this->widget3d_->GetScene()->AddGeometry(filenames_[i + 1],
+                                                         &pcd_, mat);
+
+                auto bbox = this->widget3d_->GetScene()->GetBoundingBox();
+                auto center = bbox.GetCenter().cast<float>();
+                utility::LogInfo(" Bounding box Size: {}", bbox.GetExtent());
+                this->widget3d_->SetupCamera(60, bbox, center);
+
+                timer.Stop();
+                utility::LogInfo("Update geometry takes {}",
+                                 timer.GetDuration());
+                // is_scene_updated = false;
+            });
         }
     }
 
@@ -344,28 +315,6 @@ private:
                                 pointcloud_local.GetPointAttr(attr).To(dtype_));
                     }
                 }
-
-                pointcloud_local.SetPointAttr("__visualization_scalar",
-                                              pointcloud_local.GetPoints()
-                                                      .Slice(0, 0, -1)
-                                                      .Slice(1, 0, 1)
-                                                      .To(dtype_));
-
-                utility::LogInfo(
-                        " Shape of magic attr: {}",
-                        pointcloud_local.GetPointAttr("__visualization_scalar")
-                                .GetShape()
-                                .ToString());
-
-                utility::LogInfo(
-                        " Min: {}, Max: {}",
-                        pointcloud_local.GetPointAttr("__visualization_scalar")
-                                .Min({0})
-                                .ToString(),
-                        pointcloud_local.GetPointAttr("__visualization_scalar")
-                                .Max({0})
-                                .ToString());
-
                 // Normal Estimation. Currenly Normal Estimation is not
                 // supported by Tensor Pointcloud.
                 if (registration_method_ == "PointToPoint" &&
@@ -438,7 +387,7 @@ int main(int argc, const char* argv[]) {
     }
     const std::string path_config = std::string(argv[2]);
 
-    utility::SetVerbosityLevel(utility::VerbosityLevel::Info);
+    utility::SetVerbosityLevel(utility::VerbosityLevel::Debug);
 
     auto& app = gui::Application::GetInstance();
     app.Initialize(argc, argv);
