@@ -28,29 +28,12 @@ class ReconstructionWindow : public gui::Window {
 public:
     ReconstructionWindow() : gui::Window("Open3D - Reconstruction", 1600, 900) {
         widget3d_ = std::make_shared<gui::SceneWidget>();
-
         AddChild(widget3d_);
-
         widget3d_->SetScene(
                 std::make_shared<rendering::Open3DScene>(GetRenderer()));
     }
 
     ~ReconstructionWindow() {}
-
-    // void Layout(const gui::Theme& theme) override {
-    //     Super::Layout(theme);
-
-    //     int em = theme.font_size;
-    //     int panel_width = 20 * em;
-    //     // The usable part of the window may not be the full size if there
-    //     // is a menu.
-    //     auto content_rect = GetContentRect();
-
-    //     int x = panel_->GetFrame().GetRight();
-    //     widget3d_->SetFrame(gui::Rect(x, content_rect.y,
-    //                                   output_panel_->GetFrame().x - x,
-    //                                   content_rect.height));
-    // }
 
 protected:
     std::shared_ptr<gui::SceneWidget> widget3d_;
@@ -96,45 +79,61 @@ private:
     std::thread update_thread_;
 
     void UpdateMain() {
-        t::geometry::PointCloud pcd;
-
         core::Tensor initial_transform = core::Tensor::Eye(4, dtype_, device_);
         core::Tensor cumulative_transform = initial_transform.Clone();
 
-        geometry::AxisAlignedBoundingBox bounds;
+        // geometry::AxisAlignedBoundingBox bounds;
         auto mat = rendering::Material();
-        mat.shader = "defaultUnlit";
+
+        // mat.shader = "unlitSolidColor";
+        // mat.base_color = Eigen::Vector4f(1.f, 0.0f, 0.0f, 0.6f);
+
+        // mat.shader = "defaultUnlit";
+
+        mat.shader = "unlitGradient";
+        mat.scalar_min = -10.0;
+        mat.scalar_max = 10.0;
+
+        mat.point_size = 0.5f;
+
+        mat.gradient = std::make_shared<
+                rendering::Gradient>(std::vector<rendering::Gradient::Point>{
+                rendering::Gradient::Point{0.000f, {0.0f, 0.0f, 1.0f, 1.0f}},
+                rendering::Gradient::Point{0.125f, {0.0f, 0.5f, 1.0f, 1.0f}},
+                rendering::Gradient::Point{0.250f, {0.0f, 1.0f, 1.0f, 1.0f}},
+                rendering::Gradient::Point{0.375f, {0.0f, 1.0f, 0.5f, 1.0f}},
+                rendering::Gradient::Point{0.500f, {0.0f, 1.0f, 0.0f, 1.0f}},
+                rendering::Gradient::Point{0.625f, {0.5f, 1.0f, 0.0f, 1.0f}},
+                rendering::Gradient::Point{0.750f, {1.0f, 1.0f, 0.0f, 1.0f}},
+                rendering::Gradient::Point{0.875f, {1.0f, 0.5f, 0.0f, 1.0f}},
+                rendering::Gradient::Point{1.000f, {1.0f, 0.0f, 0.0f, 1.0f}}});
 
         {
             std::lock_guard<std::mutex> lock(cloud_lock_);
-            pcd = pointclouds_host_[0].Clone();
+            pcd_ = pointclouds_host_[0].Clone();
         }
 
         if (visualize_output_) {
             gui::Application::GetInstance().PostToMainThread(this, [this,
-                                                                    bounds, mat,
-                                                                    pcd]() {
+                                                                    &mat]() {
                 std::lock_guard<std::mutex> lock(cloud_lock_);
-
-                this->widget3d_->GetScene()->GetScene()->AddGeometry(
-                        filenames_[0], pcd, mat);
-                // pcd->->PaintUniformColor({1.0, 0.0, 0.0});
-                // this->widget3d_->GetScene()->GetScene()->AddGeometry(CURRENT_CLOUD,
-                // legacy_output_, &mat);
+                this->widget3d_->GetScene()->SetBackground({0, 0, 0, 1});
+                this->widget3d_->GetScene()->AddGeometry(filenames_[0], &pcd_,
+                                                         mat);
                 auto bbox = this->widget3d_->GetScene()->GetBoundingBox();
                 auto center = bbox.GetCenter().cast<float>();
-
                 this->widget3d_->SetupCamera(60, bbox, center);
-                this->widget3d_->GetScene()->SetBackground({0, 0, 0, 1});
+
             });
         }
 
         for (int i = 0; i < end_range_ - 1; i++) {
             utility::Timer time_icp_odom_loop;
-            time_icp_odom_loop.Start();
+
             auto source = pointclouds_host_[i].To(device_);
             auto target = pointclouds_host_[i + 1].To(device_);
 
+            time_icp_odom_loop.Start();
             auto result = RegistrationMultiScaleICP(
                     source, target, voxel_sizes_, criterias_, search_radius_,
                     initial_transform, *estimation_);
@@ -144,35 +143,44 @@ private:
 
             time_icp_odom_loop.Stop();
             double total_processing_time = time_icp_odom_loop.GetDuration();
-            utility::LogDebug(" Registraion took: {}", total_processing_time);
-            utility::LogDebug(" Cumulative Transformation: \n{}\n",
-                              cumulative_transform.ToString());
+            utility::LogInfo(" Registraion took: {}, for frame: {}",
+                             total_processing_time, i);
 
-            {
-                std::lock_guard<std::mutex> lock(cloud_lock_);
-                pcd = target.Transform(cumulative_transform)
-                              .To(core::Device("CPU:0"), true);
+            if (visualize_output_ && i < end_range_ - 3) {
+                {
+                    // std::lock_guard<std::mutex> lock(cloud_lock_);
+                    pcd_ = target.Transform(cumulative_transform)
+                                   .To(core::Device("CPU:0"));
+                }
+
+                gui::Application::GetInstance().PostToMainThread(this, [this,
+                                                                        &mat,
+                                                                        i]() {
+                    // std::lock_guard<std::mutex> lock(cloud_lock_);
+                    utility::Timer timer;
+                    timer.Start();
+                    utility::LogInfo(" PCD: {}",
+                                     pcd_.GetPoints().GetShape().ToString());
+                    this->widget3d_->GetScene()->AddGeometry(filenames_[i],
+                                                             &pcd_, mat);
+
+                    utility::LogInfo(" hey ");
+                    utility::LogInfo(" Widget: {}, Size: {}",
+                                     widget3d_->GetFrame().width,
+                                     widget3d_->GetFrame().height);
+
+                    auto bbox = this->widget3d_->GetScene()->GetBoundingBox();
+                    auto center = bbox.GetCenter().cast<float>();
+                    utility::LogInfo(" Bounding box Size: {}",
+                                     bbox.GetExtent());
+                    this->widget3d_->SetupCamera(60, bbox, center);
+
+                    timer.Stop();
+                    utility::LogInfo("Update geometry takes {}",
+                                     timer.GetDuration());
+                    // is_scene_updated = false;
+                });
             }
-
-            gui::Application::GetInstance().PostToMainThread(this, [this, pcd,
-                                                                    &mat, i]() {
-                std::lock_guard<std::mutex> lock(cloud_lock_);
-                utility::Timer timer;
-                timer.Start();
-
-                this->widget3d_->GetScene()->GetScene()->AddGeometry(
-                        filenames_[i + 1], pcd, mat);
-
-                auto bbox = this->widget3d_->GetScene()->GetBoundingBox();
-                auto center = bbox.GetCenter().cast<float>();
-
-                this->widget3d_->SetupCamera(60, bbox, center);
-
-                timer.Stop();
-                utility::LogInfo("Update geometry takes {}",
-                                 timer.GetDuration());
-                // is_scene_updated = false;
-            });
         }
     }
 
@@ -299,8 +307,7 @@ private:
         std::cout << " Config file read complete. " << std::endl;
     }
 
-    // To perform required dtype conversion, normal estimation and device
-    // transfer.
+    // To perform required dtype conversion, normal estimation.
     std::vector<t::geometry::PointCloud> LoadTensorPointClouds() {
         for (int i = 0; i < end_range_; i++) {
             filenames_.push_back(path_dataset + std::to_string(i) +
@@ -326,6 +333,27 @@ private:
                                 pointcloud_local.GetPointAttr(attr).To(dtype_));
                     }
                 }
+
+                pointcloud_local.SetPointAttr(
+                        "__visualization_scalar",
+                        pointcloud_local.GetPoints().Slice(0, 0, -1).Slice(1, 0,
+                                                                           1).To(dtype_));
+
+                utility::LogInfo(
+                        " Shape of magic attr: {}",
+                        pointcloud_local.GetPointAttr("__visualization_scalar")
+                                .GetShape()
+                                .ToString());
+
+                utility::LogInfo(
+                        " Min: {}, Max: {}",
+                        pointcloud_local.GetPointAttr("__visualization_scalar")
+                                .Min({0})
+                                .ToString(),
+                        pointcloud_local.GetPointAttr("__visualization_scalar")
+                                .Max({0})
+                                .ToString());
+
                 // Normal Estimation. Currenly Normal Estimation is not
                 // supported by Tensor Pointcloud.
                 if (registration_method_ == "PointToPoint" &&
@@ -362,6 +390,7 @@ private:
     // std::shared_ptr<visualizer::O3DVisualizer> main_vis_;
 
     std::vector<open3d::t::geometry::PointCloud> pointclouds_host_;
+    t::geometry::PointCloud pcd_;
 
 private:
     std::string path_dataset;
@@ -397,7 +426,7 @@ int main(int argc, const char* argv[]) {
     }
     const std::string path_config = std::string(argv[2]);
 
-    utility::SetVerbosityLevel(utility::VerbosityLevel::Debug);
+    utility::SetVerbosityLevel(utility::VerbosityLevel::Info);
 
     auto& app = gui::Application::GetInstance();
     app.Initialize(argc, argv);

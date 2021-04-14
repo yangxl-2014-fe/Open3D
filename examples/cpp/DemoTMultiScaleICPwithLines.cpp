@@ -41,7 +41,7 @@ using namespace open3d::t::pipelines::registration;
 const int WIDTH = 1024;
 const int HEIGHT = 768;
 const std::string DATA_PATH = "../../../examples/test_data/ICP/cloud_bin_0.pcd";
-const Eigen::Vector3f CENTER_OFFSET(0.0f, 0.0f, -3.0f);
+const Eigen::Vector3f CENTER_OFFSET(0.5f, -0.5f, -5.0f);
 const std::string CLOUD_NAME = "points";
 
 const std::string SRC_CLOUD = "source_pointcloud";
@@ -115,30 +115,32 @@ private:
         // This is NOT the UI thread, need to call PostToMainThread() to
         // update the scene or any part of the UI.
 
-        geometry::AxisAlignedBoundingBox bounds;
-        Eigen::Vector3d extent;
+        // geometry::AxisAlignedBoundingBox bounds;
+        // Eigen::Vector3d extent;
         {
             std::lock_guard<std::mutex> lock(cloud_lock_);
             lsource_ = std::make_shared<geometry::PointCloud>();
             *lsource_ = source_.ToLegacyPointCloud();
             ltarget_ = std::make_shared<geometry::PointCloud>();
             *ltarget_ = target_.ToLegacyPointCloud();
-            bounds = lsource_->GetAxisAlignedBoundingBox();
-            extent = bounds.GetExtent();
+            // bounds = lsource_->GetAxisAlignedBoundingBox();
+            // extent = bounds.GetExtent();
         }
 
-        auto mat = rendering::Material();
-        mat.shader = "defaultUnlit";
+        // auto mat = rendering::Material();
+        // mat.shader = "defaultUnlit";
 
         gui::Application::GetInstance().PostToMainThread(
-                main_vis_.get(), [this, bounds, mat]() {
+                main_vis_.get(), [this]() {
                     std::lock_guard<std::mutex> lock(cloud_lock_);
-                    main_vis_->AddGeometry(SRC_CLOUD, lsource_, &mat);
-                    main_vis_->AddGeometry(DST_CLOUD, ltarget_, &mat);
+                    main_vis_->AddGeometry(SRC_CLOUD, lsource_);
+                    main_vis_->AddGeometry(DST_CLOUD, ltarget_);
                     main_vis_->ResetCameraToDefault();
-                    Eigen::Vector3f center = bounds.GetCenter().cast<float>();
+                    auto bbox = main_vis_->GetScene()->GetBoundingBox();
+                    auto center = bbox.GetCenter().cast<float>();
                     main_vis_->SetupCamera(60, center, center + CENTER_OFFSET,
                                            {0.0f, -1.0f, 0.0f});
+                    main_vis_->SetBackground({0, 0, 0, 1});
                 });
 
         utility::SetVerbosityLevel(verbosity_);
@@ -262,22 +264,16 @@ private:
                 }
 
                 gui::Application::GetInstance().PostToMainThread(
-                        main_vis_.get(), [this, mat, i]() {
-                            std::lock_guard<std::mutex> lock(cloud_lock_);
+                        main_vis_.get(), [this, i]() {
+                            // std::lock_guard<std::mutex> lock(cloud_lock_);
                             main_vis_->RemoveGeometry(SRC_CLOUD);
-                            // if (i != 0) {
-                            // main_vis_->RemoveGeometry(LINE_SET);
+
                             main_vis_->RemoveGeometry(SRC_CORRES);
                             main_vis_->RemoveGeometry(TAR_CORRES);
-                            // }
-                            main_vis_->AddGeometry(SRC_CLOUD, lsource_, &mat);
-                            main_vis_->AddGeometry(SRC_CORRES, lsrc_corres_,
-                                                   &mat);
-                            main_vis_->AddGeometry(TAR_CORRES, ltar_corres_,
-                                                   &mat);
 
-                            // main_vis_->AddGeometry(LINE_SET, lsrc_corres_,
-                            // &mat);
+                            main_vis_->AddGeometry(SRC_CLOUD, lsource_);
+                            main_vis_->AddGeometry(SRC_CORRES, lsrc_corres_);
+                            main_vis_->AddGeometry(TAR_CORRES, ltar_corres_);
                         });
 
                 // ICPConvergenceCriteria, to terminate iteration.
@@ -291,8 +287,8 @@ private:
             }
         }
         gui::Application::GetInstance().PostToMainThread(
-                main_vis_.get(), [this, mat]() {
-                    std::lock_guard<std::mutex> lock(cloud_lock_);
+                main_vis_.get(), [this]() {
+                    // std::lock_guard<std::mutex> lock(cloud_lock_);
                     main_vis_->RemoveGeometry(SRC_CORRES);
                     main_vis_->RemoveGeometry(TAR_CORRES);
                 });
@@ -431,8 +427,15 @@ private:
         // t::io::ReadPointCloud copies the pointcloud to CPU.
         t::io::ReadPointCloud(path_source_, source,
                               {"auto", false, false, true});
-        t::io::ReadPointCloud(path_target_, target,
-                              {"auto", false, false, true});
+        // t::io::ReadPointCloud(path_target_, target,
+        //                       {"auto", false, false, true});
+
+        core::Tensor temp_transform =
+                core::Tensor::Init<float>({{0.862, 0.011, -0.507, 0.5},
+                                           {-0.139, 0.967, -0.215, 0.7},
+                                           {0.487, 0.255, 0.835, -1.4},
+                                           {0.0, 0.0, 0.0, 1.0}});
+        target = source.Clone().Transform(temp_transform);
 
         // Currently only Float32 pointcloud is supported.
         for (std::string attr : {"points", "colors", "normals"}) {
@@ -455,7 +458,7 @@ private:
             core::Tensor target_normals =
                     t::geometry::PointCloud::FromLegacyPointCloud(target_legacy)
                             .GetPointNormals()
-                            .To(device_, dtype_);
+                            .To(dtype_);
             target.SetPointNormals(target_normals);
         }
 
@@ -575,6 +578,7 @@ private:
 };
 
 int main(int argc, char* argv[]) {
+    utility::SetVerbosityLevel(utility::VerbosityLevel::Debug);
     const std::string path_config = std::string(argv[2]);
     MultipleWindowsApp(path_config, core::Device(argv[1])).Run();
     return 0;
