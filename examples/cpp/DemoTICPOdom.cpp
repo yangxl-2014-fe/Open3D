@@ -48,7 +48,7 @@ public:
           host_(core::Device("CPU:0")),
           dtype_(core::Dtype::Float32) {
         ReadConfigFile(path_config);
-        pointclouds_host_ = LoadTensorPointClouds();
+        pointclouds_device_ = LoadTensorPointClouds();
 
         transformation_ =
                 core::Tensor(initial_transform_flat, {4, 4}, dtype_, device_);
@@ -57,8 +57,8 @@ public:
         std::vector<ICPConvergenceCriteria> warm_up_criteria = {
                 ICPConvergenceCriteria(0.01, 0.01, 1)};
         result_ = RegistrationMultiScaleICP(
-                pointclouds_host_[0].To(device_),
-                pointclouds_host_[1].To(device_), voxel_sizes_, criterias_,
+                pointclouds_device_[0].To(device_),
+                pointclouds_device_[1].To(device_), voxel_sizes_, criterias_,
                 search_radius_, transformation_, *estimation_);
 
         visualize_output_ = true;
@@ -91,12 +91,13 @@ private:
 
         mat.shader = "defaultUnlit";
         mat.base_color = Eigen::Vector4f(1.f, 0.0f, 0.0f, 1.0f);
-
+        mat.point_size = 5.0f;
+        
         auto pointcloud_mat = rendering::Material();
         pointcloud_mat.shader = "unlitGradient";
         pointcloud_mat.scalar_min = -4.0;
         pointcloud_mat.scalar_max = 1.0;
-        pointcloud_mat.point_size = 0.2f;
+        pointcloud_mat.point_size = 0.75f;
         // pointcloud_mat.base_color =
         //         Eigen::Vector4f(1.f, 1.0f, 1.0f, 0.5f);
 
@@ -114,7 +115,7 @@ private:
 
         {
             // std::lock_guard<std::mutex> lock(cloud_lock_);
-            pcd_ = pointclouds_host_[0].CPU();
+            pcd_ = pointclouds_device_[0].CPU();
         }
 
         if (visualize_output_) {
@@ -136,8 +137,8 @@ private:
         for (int i = 0; i < end_range_ - 1; i++) {
             utility::Timer time_icp_odom_loop, time_total, time_transform;
             time_total.Start();
-            auto source = pointclouds_host_[i].To(device_);
-            auto target = pointclouds_host_[i + 1].To(device_);
+            auto source = pointclouds_device_[i].To(device_);
+            auto target = pointclouds_device_[i + 1].To(device_);
 
             time_icp_odom_loop.Start();
             auto result = RegistrationMultiScaleICP(
@@ -327,8 +328,8 @@ private:
                                  std::string(".pcd"));
         }
 
-        std::vector<t::geometry::PointCloud> pointclouds_host(
-                filenames_.size());
+        std::vector<t::geometry::PointCloud> pointclouds_device(
+                filenames_.size(), t::geometry::PointCloud(device_));
 
         try {
             int i = 0;
@@ -372,8 +373,8 @@ private:
                     pointcloud_local.SetPointNormals(pointcloud_normals);
                 }
                 // Adding it to our vector of pointclouds.
-                pointclouds_host[i++] =
-                        pointcloud_local.VoxelDownSample(0.5).To(device_);
+                pointclouds_device[i++] =
+                        pointcloud_local.To(device_).VoxelDownSample(0.75);
             }
         } catch (...) {
             utility::LogError(
@@ -383,7 +384,7 @@ private:
                     "system might be going out-of-memory. ",
                     end_range_);
         }
-        return pointclouds_host;
+        return pointclouds_device;
     }
 
 private:
@@ -392,7 +393,7 @@ private:
     std::atomic<bool> is_done_;
     // std::shared_ptr<visualizer::O3DVisualizer> main_vis_;
 
-    std::vector<open3d::t::geometry::PointCloud> pointclouds_host_;
+    std::vector<open3d::t::geometry::PointCloud> pointclouds_device_;
     t::geometry::PointCloud pcd_;
 
 private:
