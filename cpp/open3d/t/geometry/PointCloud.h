@@ -197,6 +197,18 @@ public:
                GetPointAttr(key).GetLength() == GetPoints().GetLength();
     }
 
+    /// Returns copy of the point cloud on the same device.
+    void DeletePointAttr(const std::string &key) {
+        if (HasPointAttr(key)) {
+            point_attr_.erase(key);
+        } else {
+            utility::LogWarning(
+                    " DeletePointAttr: [Skipped] No key {}, found to be "
+                    "deleted.",
+                    key);
+        }
+    }
+
     /// Check if the "points" attribute's value has length > 0.
     /// This is a convenience function.
     bool HasPoints() const { return HasPointAttr("points"); }

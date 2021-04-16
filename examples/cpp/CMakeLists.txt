@@ -68,6 +68,7 @@ if (BUILD_GUI)
     EXAMPLE_CPP(MultipleWindows       ${CMAKE_PROJECT_NAME} Threads::Threads)
     EXAMPLE_CPP(OffscreenRendering    ${CMAKE_PROJECT_NAME})
     EXAMPLE_CPP(DemoTICPOdom          ${CMAKE_PROJECT_NAME} Threads::Threads)
+    EXAMPLE_CPP(DemoTICPMultiScale    ${CMAKE_PROJECT_NAME} Threads::Threads)
     
 endif()
 

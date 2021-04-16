@@ -92,14 +92,12 @@ private:
         mat.shader = "defaultUnlit";
         mat.base_color = Eigen::Vector4f(1.f, 0.0f, 0.0f, 1.0f);
         mat.point_size = 5.0f;
-        
+
         auto pointcloud_mat = rendering::Material();
         pointcloud_mat.shader = "unlitGradient";
         pointcloud_mat.scalar_min = -4.0;
         pointcloud_mat.scalar_max = 1.0;
-        pointcloud_mat.point_size = 0.75f;
-        // pointcloud_mat.base_color =
-        //         Eigen::Vector4f(1.f, 1.0f, 1.0f, 0.5f);
+        pointcloud_mat.point_size = 0.5f;
 
         pointcloud_mat.gradient = std::make_shared<
                 rendering::Gradient>(std::vector<rendering::Gradient::Point>{
@@ -113,10 +111,8 @@ private:
                 rendering::Gradient::Point{0.875f, {1.0f, 0.5f, 0.0f, 1.0f}},
                 rendering::Gradient::Point{1.000f, {1.0f, 0.0f, 0.0f, 1.0f}}});
 
-        {
-            // std::lock_guard<std::mutex> lock(cloud_lock_);
-            pcd_ = pointclouds_device_[0].CPU();
-        }
+        pcd_ = pointclouds_device_[0].CPU();
+        pcd_.DeletePointAttr("normals");
 
         if (visualize_output_) {
             gui::Application::GetInstance().PostToMainThread(
@@ -127,6 +123,10 @@ private:
 
                         this->widget3d_->GetScene()->AddGeometry(
                                 filenames_[0], &pcd_, pointcloud_mat);
+
+                        this->widget3d_->GetScene()->GetScene()->AddGeometry(
+                                CURRENT_CLOUD, pcd_, mat);
+
                         auto bbox =
                                 this->widget3d_->GetScene()->GetBoundingBox();
                         auto center = bbox.GetCenter().cast<float>();
@@ -139,6 +139,8 @@ private:
             time_total.Start();
             auto source = pointclouds_device_[i].To(device_);
             auto target = pointclouds_device_[i + 1].To(device_);
+
+            // target.DeletePointAttr("normals");
 
             time_icp_odom_loop.Start();
             auto result = RegistrationMultiScaleICP(
@@ -155,6 +157,7 @@ private:
                 {
                     // std::lock_guard<std::mutex> lock(cloud_lock_);
                     pcd_ = target.Transform(cumulative_transform).CPU();
+                    pcd_.DeletePointAttr("normals");
                 }
                 time_transform.Stop();
                 total_transform_time += time_transform.GetDuration();
@@ -165,12 +168,23 @@ private:
                             // std::lock_guard<std::mutex> lock(cloud_lock_);
                             utility::Timer time_viz;
                             time_viz.Start();
-                            this->widget3d_->GetScene()->RemoveGeometry(
-                                    CURRENT_CLOUD);
+
+                            // this->widget3d_->GetScene()
+                            //     ->GetScene()->RemoveGeometry(
+                            //         CURRENT_CLOUD);
+
+                            this->widget3d_->GetScene()
+                                    ->GetScene()
+                                    ->UpdateGeometry(
+                                            CURRENT_CLOUD, pcd_,
+                                            rendering::Scene::
+                                                            kUpdatePointsFlag |
+                                                    rendering::Scene::
+                                                            kUpdateColorsFlag);
+
                             this->widget3d_->GetScene()->AddGeometry(
                                     filenames_[i], &pcd_, pointcloud_mat);
-                            this->widget3d_->GetScene()->AddGeometry(
-                                    CURRENT_CLOUD, &pcd_, mat);
+
                             auto bbox = this->widget3d_->GetScene()
                                                 ->GetBoundingBox();
                             auto center = bbox.GetCenter().cast<float>();
@@ -183,6 +197,8 @@ private:
 
             time_total.Stop();
             total_time += time_total.GetDuration();
+            std::cout << std::endl
+                      << " FPS: " << 1000.0 / time_total.GetDuration();
         }
         std::cout << std::endl
                   << std::endl
@@ -355,12 +371,15 @@ private:
                                               pointcloud_local.GetPoints()
                                                       .Slice(0, 0, -1)
                                                       .Slice(1, 2, 3)
-                                                      .To(dtype_));
+                                                      .To(dtype_, true));
+
+                // pointcloud_local.DeletePointAttr("__visualization_scalar");
 
                 // Normal Estimation. Currenly Normal Estimation is not
                 // supported by Tensor Pointcloud.
-                if (registration_method_ == "PointToPoint" &&
+                if (registration_method_ == "PointToPlane" &&
                     !pointcloud_local.HasPointNormals()) {
+                    std::cout << " hey " << std::endl;
                     auto pointcloud_legacy =
                             pointcloud_local.ToLegacyPointCloud();
                     pointcloud_legacy.EstimateNormals(
