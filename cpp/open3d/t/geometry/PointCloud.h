@@ -197,10 +197,18 @@ public:
                GetPointAttr(key).GetLength() == GetPoints().GetLength();
     }
 
-    /// Returns copy of the point cloud on the same device.
+    /// Delete attributes. If attribute key present, then the attribute is
+    /// deleted, otherwise Warning is thrown. Also it is not allowed to delete
+    /// the attribute "points".
+    ///
+    /// \param key Attribute name.
     void DeletePointAttr(const std::string &key) {
-        if (HasPointAttr(key)) {
+        if (HasPointAttr(key) && key != "points") {
             point_attr_.erase(key);
+        } else if (key == "points") {
+            utility::LogError(
+                    " DeletePointAttr: Not allowed to delete the attribute "
+                    "\"points\". ");
         } else {
             utility::LogWarning(
                     " DeletePointAttr: [Skipped] No key {}, found to be "
