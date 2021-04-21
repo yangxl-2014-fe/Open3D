@@ -12,8 +12,8 @@ using namespace open3d;
 using namespace open3d::visualization;
 using namespace open3d::t::pipelines::registration;
 
-const int WIDTH = 1200;
-const int HEIGHT = 700;
+const int WIDTH = 400;
+const int HEIGHT = 300;
 float verticalFoV = 25;
 
 const Eigen::Vector3f CENTER_OFFSET(-10.0f, 0.0f, 30.0f);
@@ -27,8 +27,7 @@ class ReconstructionWindow : public gui::Window {
     using Super = gui::Window;
 
 public:
-    ReconstructionWindow()
-        : gui::Window("Open3D - Reconstruction", WIDTH, HEIGHT) {
+    ReconstructionWindow() : gui::Window("Open3D - Reconstruction", 1200, 700) {
         widget3d_ = std::make_shared<gui::SceneWidget>();
         AddChild(widget3d_);
         widget3d_->SetScene(
@@ -70,60 +69,21 @@ private:
         core::Tensor initial_transform = core::Tensor::Eye(4, dtype_, device_);
         core::Tensor cumulative_transform = initial_transform.Clone();
 
-        // Visualization parameters.
-
         // geometry::AxisAlignedBoundingBox bounds;
         auto mat = rendering::Material();
+
         // mat.shader = "unlitSolidColor";
+
         mat.shader = "defaultUnlit";
         mat.base_color = Eigen::Vector4f(1.f, 0.0f, 0.0f, 1.0f);
         // mat.point_size = 5.0f;
 
-        auto pointcloud_mat = rendering::Material();
-        pointcloud_mat.shader = "unlitGradient";
-        pointcloud_mat.scalar_min = -4.0;
-        pointcloud_mat.scalar_max = 2.0;
-        pointcloud_mat.point_size = 0.2f;
-        // pointcloud_mat.base_color =
-        //         Eigen::Vector4f(1.f, 1.0f, 1.0f, 0.5f);
-
-        pointcloud_mat.gradient = std::make_shared<
-                rendering::Gradient>(std::vector<rendering::Gradient::Point>{
-                rendering::Gradient::Point{0.000f, {0.0f, 0.25f, 0.0f, 1.0f}},
-                rendering::Gradient::Point{0.125f, {0.0f, 0.5f, 1.0f, 1.0f}},
-                rendering::Gradient::Point{0.250f, {0.0f, 1.0f, 1.0f, 1.0f}},
-                rendering::Gradient::Point{0.375f, {0.0f, 1.0f, 0.5f, 1.0f}},
-                rendering::Gradient::Point{0.500f, {0.0f, 1.0f, 0.0f, 1.0f}},
-                rendering::Gradient::Point{0.625f, {0.5f, 1.0f, 0.0f, 1.0f}},
-                rendering::Gradient::Point{0.750f, {1.0f, 1.0f, 0.0f, 1.0f}},
-                rendering::Gradient::Point{0.875f, {1.0f, 0.5f, 0.0f, 1.0f}},
-                rendering::Gradient::Point{1.000f, {1.0f, 0.0f, 0.0f, 1.0f}}});
-
-        // pointcloud_mat.gradient = std::make_shared<rendering::Gradient>(
-        //         std::vector<rendering::Gradient::Point>{
-        //                 rendering::Gradient::Point{
-        //                         0.000f, {0.3019f, 0.2705f, 0.00117f, 1.0f}},
-        //                 rendering::Gradient::Point{
-        //                         0.125f, {0.4000f, 0.3647f, 0.0156f, 1.0f}},
-        //                 rendering::Gradient::Point{
-        //                         0.250f, {0.3880f, 0.4000f, 0.0549f, 1.0f}},
-        //                 rendering::Gradient::Point{
-        //                         0.375f, {0.4867f, 0.4900f, 0.0706f, 1.0f}},
-        //                 rendering::Gradient::Point{
-        //                         0.500f, {0.5843f, 0.6040f, 0.0862f, 1.0f}},
-        //                 rendering::Gradient::Point{
-        //                         0.625f, {0.6823f, 0.7020f, 0.0980f, 1.0f}},
-        //                 rendering::Gradient::Point{
-        //                         0.750f, {0.7804f, 0.8040f, 0.1137f, 1.0f}},
-        //                 rendering::Gradient::Point{
-        //                         0.875f, {0.8784f, 0.9019f, 0.1255f, 1.0f}},
-        //                 rendering::Gradient::Point{
-        //                         1.000f, {1.0000f, 1.0000f, 0.1411f, 1.0f}}});
-
-        pcd_ = pointclouds_device_[0].CPU();
-        pcd_.DeletePointAttr("normals");
+        auto pointcloud_mat = GetPointCloudMaterial();
 
         if (visualize_output_) {
+            pcd_ = pointclouds_device_[0].CPU();
+            pcd_.DeletePointAttr("normals");
+
             gui::Application::GetInstance().PostToMainThread(
                     this, [this, &mat, &pointcloud_mat]() {
                         // std::lock_guard<std::mutex> lock(cloud_lock_);
@@ -143,22 +103,27 @@ private:
                     });
         }
 
+        // Final scale level downsampling is already performed while loading the
+        // data. -1 avoids re-downsampling for the last scale level.
+        voxel_sizes_[icp_scale_levels_ - 1] = -1;
+
         // Warm up:
         auto result = RegistrationMultiScaleICP(
                 pointclouds_device_[0].To(device_),
                 pointclouds_device_[1].To(device_), voxel_sizes_, criterias_,
                 search_radius_, initial_transform, *estimation_);
 
-        // Global variable for storing, total run time.
+        utility::SetVerbosityLevel(verbosity_);
+
+        // Global variable for storing total runtime.
         double total_time = 0;
-        
-        // Registration loop over frames in range 0 to end_range - 1.
+
         for (int i = 0; i < end_range_ - 1; i++) {
             utility::Timer time_total;
             time_total.Start();
 
-            auto source = pointclouds_device_[i];
-            auto target = pointclouds_device_[i + 1];
+            auto source = pointclouds_device_[i].To(device_);
+            auto target = pointclouds_device_[i + 1].To(device_);
 
             auto result = RegistrationMultiScaleICP(
                     source, target, voxel_sizes_, criterias_, search_radius_,
@@ -168,15 +133,14 @@ private:
                     result.transformation_.Inverse().To(device_, dtype_));
 
             if (visualize_output_ && i < end_range_ - 3) {
-                // {
-                // std::lock_guard<std::mutex> lock(cloud_lock_);
-                pcd_ = target.Transform(cumulative_transform).CPU();
-                pcd_.DeletePointAttr("normals");
-                // }
+                {
+                    // std::lock_guard<std::mutex> lock(cloud_lock_);
+                    pcd_ = target.Transform(cumulative_transform).CPU();
+                    pcd_.DeletePointAttr("normals");
+                }
 
                 gui::Application::GetInstance().PostToMainThread(
-                        this,
-                        [this, &mat, &pointcloud_mat, &i]() {
+                        this, [this, &mat, &pointcloud_mat, &i]() {
                             // std::lock_guard<std::mutex> lock(cloud_lock_);
 
                             this->widget3d_->GetScene()
@@ -230,7 +194,7 @@ private:
 
                 if (name == "dataset_path") {
                     path_dataset = value;
-                } else if (name == "dataset_path") {
+                } else if (name == "visualization") {
                     visualize = value;
                 } else if (name == "end_range") {
                     std::istringstream is(value);
@@ -296,11 +260,11 @@ private:
         for (auto rmse : relative_rmse) std::cout << rmse << " ";
         std::cout << std::endl;
 
-        icp_scale_levels_ = (int) voxel_sizes_.size();
-        if (search_radius_.size() != (size_t) icp_scale_levels_ ||
-            max_iterations.size() != (size_t) icp_scale_levels_ ||
-            relative_fitness.size() != (size_t) icp_scale_levels_ ||
-            relative_rmse.size() != (size_t) icp_scale_levels_) {
+        icp_scale_levels_ = voxel_sizes_.size();
+        if (search_radius_.size() != icp_scale_levels_ ||
+            max_iterations.size() != icp_scale_levels_ ||
+            relative_fitness.size() != icp_scale_levels_ ||
+            relative_rmse.size() != icp_scale_levels_) {
             utility::LogError(
                     " Length of vector: voxel_sizes, search_sizes, "
                     "max_iterations, "
@@ -353,9 +317,10 @@ private:
             int i = 0;
             t::geometry::PointCloud pointcloud_local;
             for (auto& path : filenames_) {
-                // utility::LogInfo(" \rLOADING... {}", path);
                 std::cout << " \rLOADING DATA... " << i * 100 / end_range_
                           << "%" << std::flush;
+                std::cout << std::endl;
+
                 t::io::ReadPointCloud(path, pointcloud_local,
                                       {"auto", false, false, true});
 
@@ -406,12 +371,58 @@ private:
         return pointclouds_device;
     }
 
+    rendering::Material GetPointCloudMaterial() {
+        auto pointcloud_mat = rendering::Material();
+        pointcloud_mat.shader = "unlitGradient";
+        pointcloud_mat.scalar_min = -4.0;
+        pointcloud_mat.scalar_max = 1.0;
+        pointcloud_mat.point_size = 0.1f;
+        // pointcloud_mat.base_color =
+        //         Eigen::Vector4f(1.f, 1.0f, 1.0f, 0.5f);
+
+        pointcloud_mat.gradient = std::make_shared<
+                rendering::Gradient>(std::vector<rendering::Gradient::Point>{
+                rendering::Gradient::Point{0.000f, {0.0f, 0.25f, 0.0f, 1.0f}},
+                rendering::Gradient::Point{0.125f, {0.0f, 0.5f, 1.0f, 1.0f}},
+                rendering::Gradient::Point{0.250f, {0.0f, 1.0f, 1.0f, 1.0f}},
+                rendering::Gradient::Point{0.375f, {0.0f, 1.0f, 0.5f, 1.0f}},
+                rendering::Gradient::Point{0.500f, {0.0f, 1.0f, 0.0f, 1.0f}},
+                rendering::Gradient::Point{0.625f, {0.5f, 1.0f, 0.0f, 1.0f}},
+                rendering::Gradient::Point{0.750f, {1.0f, 1.0f, 0.0f, 1.0f}},
+                rendering::Gradient::Point{0.875f, {1.0f, 0.5f, 0.0f, 1.0f}},
+                rendering::Gradient::Point{1.000f, {1.0f, 0.0f, 0.0f, 1.0f}}});
+
+        // pointcloud_mat.gradient = std::make_shared<rendering::Gradient>(
+        //         std::vector<rendering::Gradient::Point>{
+        //                 rendering::Gradient::Point{
+        //                         0.000f, {0.3019f, 0.2705f, 0.00117f, 1.0f}},
+        //                 rendering::Gradient::Point{
+        //                         0.125f, {0.4000f, 0.3647f, 0.0156f, 1.0f}},
+        //                 rendering::Gradient::Point{
+        //                         0.250f, {0.3880f, 0.4000f, 0.0549f, 1.0f}},
+        //                 rendering::Gradient::Point{
+        //                         0.375f, {0.4867f, 0.4900f, 0.0706f, 1.0f}},
+        //                 rendering::Gradient::Point{
+        //                         0.500f, {0.5843f, 0.6040f, 0.0862f, 1.0f}},
+        //                 rendering::Gradient::Point{
+        //                         0.625f, {0.6823f, 0.7020f, 0.0980f, 1.0f}},
+        //                 rendering::Gradient::Point{
+        //                         0.750f, {0.7804f, 0.8040f, 0.1137f, 1.0f}},
+        //                 rendering::Gradient::Point{
+        //                         0.875f, {0.8784f, 0.9019f, 0.1255f, 1.0f}},
+        //                 rendering::Gradient::Point{
+        //                         1.000f, {1.0000f, 1.0000f, 0.1411f, 1.0f}}});
+
+        return pointcloud_mat;
+    }
+
 private:
     std::mutex cloud_lock_;
+
     std::atomic<bool> is_done_;
+    // std::shared_ptr<visualizer::O3DVisualizer> main_vis_;
 
     std::vector<open3d::t::geometry::PointCloud> pointclouds_device_;
-    // t point cloud used for visualization.
     t::geometry::PointCloud pcd_;
 
 private:
@@ -425,7 +436,7 @@ private:
 private:
     std::vector<double> voxel_sizes_;
     std::vector<double> search_radius_;
-    int64_t icp_scale_levels_;
+    size_t icp_scale_levels_;
     std::vector<ICPConvergenceCriteria> criterias_;
     std::shared_ptr<TransformationEstimation> estimation_;
 
@@ -445,9 +456,8 @@ private:
 //------------------------------------------------------------------------------
 int main(int argc, const char* argv[]) {
     if (argc < 3) {
-        utility::LogError("Expected device and dataset path as input.");
+        utility::LogError("Expected [device] and [config file path] as input");
     }
-
     const std::string path_config = std::string(argv[2]);
 
     auto& app = gui::Application::GetInstance();
