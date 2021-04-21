@@ -319,7 +319,6 @@ private:
             for (auto& path : filenames_) {
                 std::cout << " \rLOADING DATA... " << i * 100 / end_range_
                           << "%" << std::flush;
-                std::cout << std::endl;
 
                 t::io::ReadPointCloud(path, pointcloud_local,
                                       {"auto", false, false, true});
@@ -360,6 +359,7 @@ private:
                         pointcloud_local.To(device_).VoxelDownSample(
                                 voxel_sizes_[icp_scale_levels_ - 1]);
             }
+            std::cout << std::endl;
         } catch (...) {
             utility::LogError(
                     " Failed to read pointcloud in sequence. Ensure pointcloud "
@@ -368,6 +368,7 @@ private:
                     "system might be going out-of-memory. ",
                     end_range_);
         }
+
         return pointclouds_device;
     }
 
