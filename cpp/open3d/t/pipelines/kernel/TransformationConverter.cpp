@@ -121,12 +121,12 @@ core::Tensor PoseToTransformation(const core::Tensor &pose) {
     return transformation;
 }
 
-// TODO(@rishabh): Remove this overloaded function, and add residual and inlier
-// count, in ICP.
-void DecodeAndSolve6x6(const core::Tensor &A_reduction, core::Tensor &delta) {
+void DecodeAndSolve6x6(const core::Tensor &A_reduction,
+                       core::Tensor &delta,
+                       core::Tensor &residual) {
     const core::Device host(core::Device("CPU:0"));
-    core::Tensor A_1x27_host = A_reduction.To(host, core::Dtype::Float64);
-    double *A_1x27_ptr = A_1x27_host.GetDataPtr<double>();
+    core::Tensor A_1x29_host = A_reduction.To(host, core::Dtype::Float64);
+    double *A_1x29_ptr = A_1x29_host.GetDataPtr<double>();
 
     core::Tensor AtA = core::Tensor::Empty({6, 6}, core::Dtype::Float64, host);
     core::Tensor Atb = core::Tensor::Empty({6}, core::Dtype::Float64, host);
@@ -135,28 +135,18 @@ void DecodeAndSolve6x6(const core::Tensor &A_reduction, core::Tensor &delta) {
     double *Atb_local_ptr = Atb.GetDataPtr<double>();
 
     for (int j = 0; j < 6; j++) {
-        Atb_local_ptr[j] = A_1x27_ptr[21 + j];
+        Atb_local_ptr[j] = A_1x29_ptr[21 + j];
         const int64_t reduction_idx = ((j * (j + 1)) / 2);
         for (int k = 0; k <= j; k++) {
-            AtA_local_ptr[j * 6 + k] = A_1x27_ptr[reduction_idx + k];
-            AtA_local_ptr[k * 6 + j] = A_1x27_ptr[reduction_idx + k];
+            AtA_local_ptr[j * 6 + k] = A_1x29_ptr[reduction_idx + k];
+            AtA_local_ptr[k * 6 + j] = A_1x29_ptr[reduction_idx + k];
         }
     }
 
+    residual = core::Tensor::Init<double>({A_1x29_ptr[27]}, host);
+
     // Solve on CPU with double to ensure precision.
     delta = AtA.Solve(Atb.Neg());
-}
-
-void DecodeAndSolve6x6(const core::Tensor &A_reduction,
-                       core::Tensor &delta,
-                       core::Tensor &residual) {
-    DecodeAndSolve6x6(A_reduction, delta);
-
-    const core::Device host(core::Device("CPU:0"));
-    core::Tensor A_1x29_host = A_reduction.To(host, core::Dtype::Float64);
-    double *A_1x29_ptr = A_1x29_host.GetDataPtr<double>();
-
-    residual = core::Tensor::Init<double>({A_1x29_ptr[27]}, host);
 
     const int count = static_cast<int>(A_1x29_ptr[28]);
     utility::LogDebug("avg loss = {}, residual = {}, count = {}",

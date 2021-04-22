@@ -59,8 +59,6 @@ void DecodeAndSolve6x6(const core::Tensor &A_reduction,
                        core::Tensor &delta,
                        core::Tensor &residual);
 
-void DecodeAndSolve6x6(const core::Tensor &A_reduction, core::Tensor &delta);
-
 }  // namespace kernel
 }  // namespace pipelines
 }  // namespace t

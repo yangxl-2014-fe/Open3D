@@ -81,8 +81,8 @@ private:
         auto pointcloud_mat = GetPointCloudMaterial();
 
         if (visualize_output_) {
-            pcd_ = pointclouds_device_[0].CPU();
-            pcd_.DeletePointAttr("normals");
+            pcd_current_ = pointclouds_device_[0].CPU();
+            // pcd_current_.DeletePointAttr("normals");
 
             gui::Application::GetInstance().PostToMainThread(
                     this, [this, &mat, &pointcloud_mat]() {
@@ -91,10 +91,10 @@ private:
                                 {0, 0, 0, 1.0});
 
                         this->widget3d_->GetScene()->AddGeometry(
-                                filenames_[0], &pcd_, pointcloud_mat);
+                                filenames_[0], &pcd_current_, pointcloud_mat);
 
                         this->widget3d_->GetScene()->GetScene()->AddGeometry(
-                                CURRENT_CLOUD, pcd_, mat);
+                                CURRENT_CLOUD, pcd_current_, mat);
 
                         auto bbox =
                                 this->widget3d_->GetScene()->GetBoundingBox();
@@ -135,25 +135,26 @@ private:
             if (visualize_output_ && i < end_range_ - 3) {
                 {
                     // std::lock_guard<std::mutex> lock(cloud_lock_);
-                    pcd_ = target.Transform(cumulative_transform).CPU();
-                    pcd_.DeletePointAttr("normals");
+                    pcd_current_ = target.Transform(cumulative_transform).CPU();
+                    // pcd_current_.DeletePointAttr("normals");
                 }
 
                 gui::Application::GetInstance().PostToMainThread(
                         this, [this, &mat, &pointcloud_mat, &i]() {
                             // std::lock_guard<std::mutex> lock(cloud_lock_);
 
+                            this->widget3d_->GetScene()->AddGeometry(
+                                    filenames_[i], &pcd_current_,
+                                    pointcloud_mat);
+
                             this->widget3d_->GetScene()
                                     ->GetScene()
                                     ->UpdateGeometry(
-                                            CURRENT_CLOUD, pcd_,
+                                            CURRENT_CLOUD, pcd_current_,
                                             rendering::Scene::
                                                             kUpdatePointsFlag |
                                                     rendering::Scene::
                                                             kUpdateColorsFlag);
-
-                            this->widget3d_->GetScene()->AddGeometry(
-                                    filenames_[i], &pcd_, pointcloud_mat);
 
                             auto bbox = this->widget3d_->GetScene()
                                                 ->GetBoundingBox();
@@ -425,6 +426,7 @@ private:
 
     std::vector<open3d::t::geometry::PointCloud> pointclouds_device_;
     t::geometry::PointCloud pcd_;
+    t::geometry::PointCloud pcd_current_;
 
 private:
     std::string path_dataset;
