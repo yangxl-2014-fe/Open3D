@@ -51,6 +51,32 @@ __global__ void ComputePosePointToPlaneCUDAKernel(
     __shared__ float local_sum0[THREAD_1D_UNIT];
     __shared__ float local_sum1[THREAD_1D_UNIT];
     __shared__ float local_sum2[THREAD_1D_UNIT];
+    __shared__ float local_sum3[THREAD_1D_UNIT];
+    __shared__ float local_sum4[THREAD_1D_UNIT];
+    __shared__ float local_sum5[THREAD_1D_UNIT];
+    __shared__ float local_sum6[THREAD_1D_UNIT];
+    __shared__ float local_sum7[THREAD_1D_UNIT];
+    __shared__ float local_sum8[THREAD_1D_UNIT];
+    __shared__ float local_sum9[THREAD_1D_UNIT];
+    __shared__ float local_sum10[THREAD_1D_UNIT];
+    __shared__ float local_sum11[THREAD_1D_UNIT];
+    __shared__ float local_sum12[THREAD_1D_UNIT];
+    __shared__ float local_sum13[THREAD_1D_UNIT];
+    __shared__ float local_sum14[THREAD_1D_UNIT];
+    __shared__ float local_sum15[THREAD_1D_UNIT];
+    __shared__ float local_sum16[THREAD_1D_UNIT];
+    __shared__ float local_sum17[THREAD_1D_UNIT];
+    __shared__ float local_sum18[THREAD_1D_UNIT];
+    __shared__ float local_sum19[THREAD_1D_UNIT];
+    __shared__ float local_sum20[THREAD_1D_UNIT];
+    __shared__ float local_sum21[THREAD_1D_UNIT];
+    __shared__ float local_sum22[THREAD_1D_UNIT];
+    __shared__ float local_sum23[THREAD_1D_UNIT];
+    __shared__ float local_sum24[THREAD_1D_UNIT];
+    __shared__ float local_sum25[THREAD_1D_UNIT];
+    __shared__ float local_sum26[THREAD_1D_UNIT];
+    __shared__ float local_sum27[THREAD_1D_UNIT];
+    __shared__ float local_sum28[THREAD_1D_UNIT];
 
     const int tid = threadIdx.x + threadIdx.y * blockDim.x;
 
@@ -59,6 +85,32 @@ __global__ void ComputePosePointToPlaneCUDAKernel(
     local_sum0[tid] = 0;
     local_sum1[tid] = 0;
     local_sum2[tid] = 0;
+    local_sum3[tid] = 0;
+    local_sum4[tid] = 0;
+    local_sum5[tid] = 0;
+    local_sum6[tid] = 0;
+    local_sum7[tid] = 0;
+    local_sum8[tid] = 0;
+    local_sum9[tid] = 0;
+    local_sum10[tid] = 0;
+    local_sum11[tid] = 0;
+    local_sum12[tid] = 0;
+    local_sum13[tid] = 0;
+    local_sum14[tid] = 0;
+    local_sum15[tid] = 0;
+    local_sum16[tid] = 0;
+    local_sum17[tid] = 0;
+    local_sum18[tid] = 0;
+    local_sum19[tid] = 0;
+    local_sum20[tid] = 0;
+    local_sum21[tid] = 0;
+    local_sum22[tid] = 0;
+    local_sum23[tid] = 0;
+    local_sum24[tid] = 0;
+    local_sum25[tid] = 0;
+    local_sum26[tid] = 0;
+    local_sum27[tid] = 0;
+    local_sum28[tid] = 0;
 
     float J[6] = {0}, reduction[21 + 6];
     float r = 0;
@@ -82,7 +134,12 @@ __global__ void ComputePosePointToPlaneCUDAKernel(
 
     ReduceSum6x6LinearSystem<float, THREAD_1D_UNIT>(
             tid, valid, reduction, local_sum0, local_sum1, local_sum2,
-            global_sum,
+            local_sum3, local_sum4, local_sum5, local_sum6, local_sum7,
+            local_sum8, local_sum9, local_sum10, local_sum11, local_sum12,
+            local_sum13, local_sum14, local_sum15, local_sum16, local_sum17,
+            local_sum18, local_sum19, local_sum20, local_sum21, local_sum22,
+            local_sum23, local_sum24, local_sum25, local_sum26, local_sum27,
+            local_sum28, global_sum,
             /*reduce_residual = */ false);
 }
 
