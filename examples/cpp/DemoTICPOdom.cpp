@@ -28,16 +28,55 @@ class ReconstructionWindow : public gui::Window {
 
 public:
     ReconstructionWindow() : gui::Window("Open3D - Reconstruction", 1200, 700) {
+        auto& theme = GetTheme();
+        int em = theme.font_size;
+        int spacing = int(std::round(0.5f * float(em)));
+        gui::Margins margins(int(std::round(0.5f * float(em))));
+
         widget3d_ = std::make_shared<gui::SceneWidget>();
+        output_panel_ = std::make_shared<gui::Vert>(spacing, margins);
+
         AddChild(widget3d_);
+        AddChild(output_panel_);
+
+        output_ = std::make_shared<gui::Label>("");
+        output_panel_->AddChild(std::make_shared<gui::Label>("FPS"));
+        output_panel_->AddChild(output_);
+
         widget3d_->SetScene(
                 std::make_shared<rendering::Open3DScene>(GetRenderer()));
     }
 
     ~ReconstructionWindow() {}
 
+    void Layout(const gui::Theme& theme) override {
+        Super::Layout(theme);
+
+        int em = theme.font_size;
+        int panel_width = 15 * em;
+        // The usable part of the window may not be the full size if there
+        // is a menu.
+        auto content_rect = GetContentRect();
+
+        output_panel_->SetFrame(gui::Rect(content_rect.GetRight() - panel_width,
+                                          content_rect.y, panel_width,
+                                          content_rect.height));
+
+        widget3d_->SetFrame(
+                gui::Rect(content_rect.x, content_rect.y,
+                          output_panel_->GetFrame().x - content_rect.x,
+                          content_rect.height));
+    }
+
 protected:
     std::shared_ptr<gui::SceneWidget> widget3d_;
+    std::shared_ptr<gui::Vert> panel_;
+    std::shared_ptr<gui::Vert> output_panel_;
+    std::shared_ptr<gui::Label> output_;
+
+    void SetOutput(const std::string& output) {
+        output_->SetText(output.c_str());
+    }
 };
 
 //------------------------------------------------------------------------------
@@ -117,6 +156,9 @@ private:
 
         // Global variable for storing total runtime.
         double total_time = 0;
+        double time_prev = 0;
+
+        std::stringstream out;
 
         for (int i = 0; i < end_range_ - 1; i++) {
             utility::Timer time_total;
@@ -139,9 +181,13 @@ private:
                     // pcd_current_.DeletePointAttr("normals");
                 }
 
+                out << time_prev << " FPS." << std::endl;
+
                 gui::Application::GetInstance().PostToMainThread(
-                        this, [this, &mat, &pointcloud_mat, &i]() {
+                        this,
+                        [this, &mat, &pointcloud_mat, &i, out = out.str()]() {
                             // std::lock_guard<std::mutex> lock(cloud_lock_);
+                            this->SetOutput(out);
 
                             this->widget3d_->GetScene()->AddGeometry(
                                     filenames_[i], &pcd_current_,
@@ -165,7 +211,8 @@ private:
             }
 
             time_total.Stop();
-            total_time += time_total.GetDuration();
+            time_prev = time_total.GetDuration();
+            total_time += time_prev;
             // std::cout << std::endl
             //           << " FPS: " << 1000.0 / time_total.GetDuration();
         }
