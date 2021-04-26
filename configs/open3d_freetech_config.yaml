@@ -1,0 +1,16 @@
+WORKSPACE:
+  HOME: .
+  INPUT:
+    DIR: input
+  CONFIG:
+    DIR: config
+    ENABLE_LOG: true
+    RELEASE: false
+    ENABLE_QUIET: false
+  OUTPUT:
+    DIR: output
+  LOG:
+    DIR: log
+    FILE: open3d_freetech.log
+  TEMP:
+    DATA_TEMP: temp
